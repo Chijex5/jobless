@@ -9,7 +9,9 @@ import { useAppTheme } from '@/theme/use-app-theme';
 const SECTION_STAGGER_MS = 110;
 const SECTION_REVEAL_DURATION_MS = 360;
 const SOURCE_EXPAND_DURATION_MS = 220;
+const SOURCE_EXPANDED_MAX_HEIGHT = 420;
 const SCORE_PULSE_DURATION_MS = 1200;
+const SECTION_COUNT = 6;
 
 const getStrengthLabel = (score: number) => {
   if (score >= 90) {
@@ -25,15 +27,15 @@ export default function OpportunityDetailScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
-  const id = typeof params.id === 'string' ? params.id : '';
-  const signal = useMemo(() => getIntelligenceSignalById(id), [id]);
-  const relatedSignals = useMemo(() => getRelatedIntelligenceSignals(id), [id]);
+  const id = typeof params.id === 'string' ? params.id : undefined;
+  const signal = useMemo(() => (id ? getIntelligenceSignalById(id) : undefined), [id]);
+  const relatedSignals = useMemo(() => (id ? getRelatedIntelligenceSignals(id) : []), [id]);
 
   const [isSaved, setIsSaved] = useState(false);
   const [interestState, setInterestState] = useState<'none' | 'interested' | 'not-relevant'>('none');
   const [sourceExpanded, setSourceExpanded] = useState(false);
 
-  const sectionAnimations = useRef(Array.from({ length: 7 }, () => new Animated.Value(0))).current;
+  const sectionAnimations = useRef(Array.from({ length: SECTION_COUNT }, () => new Animated.Value(0))).current;
   const sourceAnimation = useRef(new Animated.Value(0)).current;
   const scoreScale = useRef(new Animated.Value(1)).current;
   const scoreGlow = useRef(new Animated.Value(0.4)).current;
@@ -105,7 +107,7 @@ export default function OpportunityDetailScreen() {
   }
 
   const strength = getStrengthLabel(signal.aiMatchScore);
-  const sourceHeight = sourceAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 220] });
+  const sourceHeight = sourceAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, SOURCE_EXPANDED_MAX_HEIGHT] });
   const sourceOpacity = sourceAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
