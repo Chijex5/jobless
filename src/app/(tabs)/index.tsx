@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -27,10 +28,10 @@ const FILTER_STRATEGIES: Record<string, (signal: Signal) => boolean> = {
 
 export default function IntelligenceScreen() {
   const theme = useAppTheme();
+  const router = useRouter();
   const [activeFilter, setActiveFilter] = useState('AI');
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
-  const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
   const [scanningStateIndex, setScanningStateIndex] = useState(0);
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
@@ -78,9 +79,6 @@ export default function IntelligenceScreen() {
 
   const toggleSave = (id: string) => {
     setSavedIds((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-  const handleViewDetails = (id: string) => {
-    setExpandedDetailId((prev) => (prev === id ? null : id));
   };
 
   return (
@@ -177,9 +175,7 @@ export default function IntelligenceScreen() {
           {filteredSignals.map((item) => {
             const animation = getCardAnimation(item.id);
             const sourceExpanded = expandedSourceId === item.id;
-            const detailsExpanded = expandedDetailId === item.id;
             const saved = Boolean(savedIds[item.id]);
-            const [primaryTag, secondaryTag] = item.skillTags;
             return (
               <Animated.View
                 key={item.id}
@@ -224,25 +220,6 @@ export default function IntelligenceScreen() {
                     ))}
                   </View>
 
-                  {detailsExpanded ? (
-                    <View
-                      style={{
-                        borderRadius: theme.radius.md,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: theme.colors.border,
-                        padding: theme.spacing.sm,
-                        backgroundColor: theme.colors.surfaceStrong,
-                      }}>
-                      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-                        Why it stands out: high signal alignment for {primaryTag}
-                        {secondaryTag ? ` and ${secondaryTag}` : ''} readiness.
-                      </Text>
-                      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-                        Suggested next action: tailor your resume for {item.role} outcomes and share 1 project proof point.
-                      </Text>
-                    </View>
-                  ) : null}
-
                   <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
                     <Pressable onPress={() => toggleSave(item.id)} style={{ flex: 1 }}>
                       {({ pressed }) => (
@@ -262,7 +239,9 @@ export default function IntelligenceScreen() {
                         </View>
                       )}
                     </Pressable>
-                    <Pressable onPress={() => handleViewDetails(item.id)} style={{ flex: 1 }}>
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/opportunity/[id]', params: { id: item.id } })}
+                      style={{ flex: 1 }}>
                       {({ pressed }) => (
                         <View
                           style={{
