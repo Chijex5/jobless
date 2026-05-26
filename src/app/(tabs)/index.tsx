@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Chip, LivePulse } from '@/components/ui';
@@ -8,12 +8,27 @@ import { useAppTheme } from '@/theme/use-app-theme';
 const CARD_STAGGER_DELAY_MS = 90;
 const CARD_ANIMATION_DURATION_MS = 420;
 const LOADING_STATE_INTERVAL_MS = 1900;
+type Signal = (typeof intelligenceSignals)[number];
+
+const FILTER_STRATEGIES: Record<string, (signal: Signal) => boolean> = {
+  Frontend: (item) => item.role.toLowerCase().includes('frontend'),
+  Backend: (item) => item.role.toLowerCase().includes('backend'),
+  AI: (item) =>
+    item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm') || tag.toLowerCase().includes('ai')),
+  Data: (item) => item.role.toLowerCase().includes('data'),
+  Remote: (item) => item.location.toLowerCase().includes('remote'),
+  Nigeria: (item) => item.location.toLowerCase().includes('nigeria'),
+  Global: (item) => item.location.toLowerCase().includes('global'),
+  React: (item) => item.skillTags.some((tag) => tag.toLowerCase().includes('react')),
+  Python: (item) => item.skillTags.some((tag) => tag.toLowerCase().includes('python')),
+};
 
 export default function IntelligenceScreen() {
   const theme = useAppTheme();
   const [activeFilter, setActiveFilter] = useState('AI');
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
+  const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
   const [loaderIndex, setLoaderIndex] = useState(0);
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
@@ -22,17 +37,6 @@ export default function IntelligenceScreen() {
   const opportunityCount = intelligenceSignals.length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const filterStrategies: Record<string, (signal: (typeof intelligenceSignals)[number]) => boolean> = {
-    Frontend: (item) => item.role.toLowerCase().includes('frontend'),
-    Backend: (item) => item.role.toLowerCase().includes('backend'),
-    AI: (item) => item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm')),
-    Data: (item) => item.role.toLowerCase().includes('data'),
-    Remote: (item) => item.location.toLowerCase().includes('remote'),
-    Nigeria: (item) => item.location.toLowerCase().includes('nigeria'),
-    Global: (item) => item.location.toLowerCase().includes('global'),
-    React: (item) => item.skillTags.some((tag) => tag.toLowerCase().includes('react')),
-    Python: (item) => item.skillTags.some((tag) => tag.toLowerCase().includes('python')),
-  };
   const getCardAnimation = useCallback(
     (id: string) => {
       if (!cardAnimations[id]) {
@@ -42,10 +46,10 @@ export default function IntelligenceScreen() {
     },
     [cardAnimations]
   );
-  const filteredSignals = intelligenceSignals.filter((item) => {
-    const strategy = filterStrategies[activeFilter];
-    return strategy ? strategy(item) : true;
-  });
+  const filteredSignals = useMemo(() => {
+    const strategy = FILTER_STRATEGIES[activeFilter];
+    return intelligenceSignals.filter((item) => (strategy ? strategy(item) : true));
+  }, [activeFilter]);
 
   useEffect(() => {
     const sequence = Animated.stagger(
@@ -73,7 +77,9 @@ export default function IntelligenceScreen() {
   const toggleSave = (id: string) => {
     setSavedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
-  const handleViewDetails = (id: string) => setExpandedSourceId(id);
+  const handleViewDetails = (id: string) => {
+    setExpandedDetailId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -169,6 +175,7 @@ export default function IntelligenceScreen() {
           {filteredSignals.map((item) => {
             const animation = getCardAnimation(item.id);
             const sourceExpanded = expandedSourceId === item.id;
+            const detailsExpanded = expandedDetailId === item.id;
             const saved = Boolean(savedIds[item.id]);
             return (
               <Animated.View
@@ -213,6 +220,24 @@ export default function IntelligenceScreen() {
                       <Chip key={`${item.id}-${tag}`} theme={theme} label={tag} />
                     ))}
                   </View>
+
+                  {detailsExpanded ? (
+                    <View
+                      style={{
+                        borderRadius: theme.radius.md,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: theme.colors.border,
+                        padding: theme.spacing.sm,
+                        backgroundColor: theme.colors.surfaceStrong,
+                      }}>
+                      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+                        {item.company} · {item.location}
+                      </Text>
+                      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+                        AI match score: {item.aiMatchScore}% · Detected {item.postedAt}
+                      </Text>
+                    </View>
+                  ) : null}
 
                   <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
                     <Pressable onPress={() => toggleSave(item.id)} style={{ flex: 1 }}>
