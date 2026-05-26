@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Chip, LivePulse } from '@/components/ui';
@@ -15,56 +15,53 @@ export default function IntelligenceScreen() {
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [loaderIndex, setLoaderIndex] = useState(0);
-  const cardAnimations = useRef(
-    intelligenceSignals.reduce<Record<string, Animated.Value>>((acc, signal) => {
-      acc[signal.id] = new Animated.Value(0);
-      return acc;
-    }, {})
-  ).current;
+  const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
   const loadingStates = ['Analyzing internship signals', 'Ranking opportunities', 'Scanning Twitter/X'];
   const filters = ['Frontend', 'Backend', 'AI', 'Data', 'Remote', 'Nigeria', 'Global', 'React', 'Python'];
   const opportunityCount = intelligenceSignals.length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const filterStrategies: Record<string, (signal: (typeof intelligenceSignals)[number]) => boolean> = {
+    Frontend: (item) => item.role.toLowerCase().includes('frontend'),
+    Backend: (item) => item.role.toLowerCase().includes('backend'),
+    AI: (item) => item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm')),
+    Data: (item) => item.role.toLowerCase().includes('data'),
+    Remote: (item) => item.location.toLowerCase().includes('remote'),
+    Nigeria: (item) => item.location.toLowerCase().includes('nigeria'),
+    Global: (item) => item.location.toLowerCase().includes('global'),
+    React: (item) => item.skillTags.some((tag) => tag.toLowerCase().includes('react')),
+    Python: (item) => item.skillTags.some((tag) => tag.toLowerCase().includes('python')),
+  };
+  const getCardAnimation = useCallback(
+    (id: string) => {
+      if (!cardAnimations[id]) {
+        cardAnimations[id] = new Animated.Value(0);
+      }
+      return cardAnimations[id];
+    },
+    [cardAnimations]
+  );
   const filteredSignals = intelligenceSignals.filter((item) => {
-    if (activeFilter === 'Remote') {
-      return item.location.toLowerCase().includes('remote');
-    }
-    if (activeFilter === 'Nigeria') {
-      return item.location.toLowerCase().includes('nigeria');
-    }
-    if (activeFilter === 'Global') {
-      return item.location.toLowerCase().includes('global');
-    }
-    if (activeFilter === 'Frontend') {
-      return item.role.toLowerCase().includes('frontend');
-    }
-    if (activeFilter === 'Backend') {
-      return item.role.toLowerCase().includes('backend');
-    }
-    if (activeFilter === 'Data') {
-      return item.role.toLowerCase().includes('data');
-    }
-    if (activeFilter === 'AI') {
-      return item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm'));
-    }
-    return item.skillTags.some((tag) => tag.toLowerCase().includes(activeFilter.toLowerCase()));
+    const strategy = filterStrategies[activeFilter];
+    return strategy ? strategy(item) : true;
   });
 
   useEffect(() => {
     const sequence = Animated.stagger(
       CARD_STAGGER_DELAY_MS,
-      Object.values(cardAnimations).map((anim) =>
-        Animated.timing(anim, {
+      filteredSignals.map((signal) => {
+        const animation = getCardAnimation(signal.id);
+        animation.setValue(0);
+        return Animated.timing(animation, {
           toValue: 1,
           duration: CARD_ANIMATION_DURATION_MS,
           useNativeDriver: true,
-        })
-      )
+        });
+      })
     );
     sequence.start();
-  }, [cardAnimations]);
+  }, [filteredSignals, getCardAnimation]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -76,6 +73,7 @@ export default function IntelligenceScreen() {
   const toggleSave = (id: string) => {
     setSavedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
+  const handleViewDetails = (id: string) => setExpandedSourceId(id);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -169,7 +167,7 @@ export default function IntelligenceScreen() {
 
         <View style={{ gap: theme.spacing.md }}>
           {filteredSignals.map((item) => {
-            const animation = cardAnimations[item.id];
+            const animation = getCardAnimation(item.id);
             const sourceExpanded = expandedSourceId === item.id;
             const saved = Boolean(savedIds[item.id]);
             return (
@@ -235,7 +233,7 @@ export default function IntelligenceScreen() {
                         </View>
                       )}
                     </Pressable>
-                    <Pressable style={{ flex: 1 }}>
+                    <Pressable onPress={() => handleViewDetails(item.id)} style={{ flex: 1 }}>
                       {({ pressed }) => (
                         <View
                           style={{
