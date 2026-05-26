@@ -95,6 +95,11 @@ const INSIGHTS = [
   },
 ] as const;
 
+const DARK_TREND_ROW_TINT = '90';
+const DARK_INSIGHT_CARD_TINT = 'D8';
+const PERCENT_ANIMATION_DURATION_MS = 760;
+const PERCENT_ANIMATION_STEPS = 24;
+
 type AppTheme = ReturnType<typeof useAppTheme>;
 type TrendItem = (typeof TREND_CARDS)[number]['items'][number];
 
@@ -105,22 +110,28 @@ function AnimatedChange({ value, theme }: { value: number; theme: AppTheme }) {
   useEffect(() => {
     progress.stopAnimation();
     progress.setValue(0);
-    const listenerId = progress.addListener(({ value: raw }) => {
-      const next = Math.round(raw * value);
-      setDisplayValue(next);
-    });
+    setDisplayValue(0);
 
     const animation = Animated.timing(progress, {
       toValue: 1,
-      duration: 760,
+      duration: PERCENT_ANIMATION_DURATION_MS,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     });
 
     animation.start();
 
+    let step = 0;
+    const timer = setInterval(() => {
+      step += 1;
+      setDisplayValue(Math.round((value * step) / PERCENT_ANIMATION_STEPS));
+      if (step >= PERCENT_ANIMATION_STEPS) {
+        clearInterval(timer);
+      }
+    }, Math.round(PERCENT_ANIMATION_DURATION_MS / PERCENT_ANIMATION_STEPS));
+
     return () => {
-      progress.removeListener(listenerId);
+      clearInterval(timer);
       progress.stopAnimation();
     };
   }, [progress, value]);
@@ -180,7 +191,8 @@ function TrendRow({
         borderRadius: theme.radius.md,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: theme.colors.border,
-        backgroundColor: theme.appearance === 'dark' ? `${theme.colors.surfaceElevated}90` : theme.colors.surface,
+        backgroundColor:
+          theme.appearance === 'dark' ? `${theme.colors.surfaceElevated}${DARK_TREND_ROW_TINT}` : theme.colors.surface,
       }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm, alignItems: 'center' }}>
         <Text style={{ ...theme.typography.body, color: theme.colors.textPrimary, flex: 1 }}>{item.label}</Text>
@@ -195,7 +207,9 @@ function TrendRow({
 
 export default function SignalsScreen() {
   const theme = useAppTheme();
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(TREND_CARDS[0].id);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(
+    TREND_CARDS.length > 0 ? TREND_CARDS[0].id : null
+  );
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -300,7 +314,8 @@ export default function SignalsScreen() {
                 borderRadius: theme.radius.lg,
                 gap: theme.spacing.xs,
                 borderColor: theme.colors.border,
-                backgroundColor: theme.appearance === 'dark' ? `${theme.colors.surfaceStrong}D8` : theme.colors.surface,
+                backgroundColor:
+                  theme.appearance === 'dark' ? `${theme.colors.surfaceStrong}${DARK_INSIGHT_CARD_TINT}` : theme.colors.surface,
               }}>
               <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{insight.title}</Text>
               <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>{insight.detail}</Text>
