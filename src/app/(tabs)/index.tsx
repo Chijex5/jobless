@@ -5,25 +5,60 @@ import { Card, Chip, LivePulse } from '@/components/ui';
 import { intelligenceSignals } from '@/data/mock';
 import { useAppTheme } from '@/theme/use-app-theme';
 
+const CARD_STAGGER_DELAY_MS = 90;
+const CARD_ANIMATION_DURATION_MS = 420;
+const LOADING_STATE_INTERVAL_MS = 1900;
+
 export default function IntelligenceScreen() {
   const theme = useAppTheme();
   const [activeFilter, setActiveFilter] = useState('AI');
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [loaderIndex, setLoaderIndex] = useState(0);
-  const cardAnimations = useRef(intelligenceSignals.map(() => new Animated.Value(0))).current;
+  const cardAnimations = useRef(
+    intelligenceSignals.reduce<Record<string, Animated.Value>>((acc, signal) => {
+      acc[signal.id] = new Animated.Value(0);
+      return acc;
+    }, {})
+  ).current;
 
   const loadingStates = ['Analyzing internship signals', 'Ranking opportunities', 'Scanning Twitter/X'];
   const filters = ['Frontend', 'Backend', 'AI', 'Data', 'Remote', 'Nigeria', 'Global', 'React', 'Python'];
   const opportunityCount = intelligenceSignals.length;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const filteredSignals = intelligenceSignals.filter((item) => {
+    if (activeFilter === 'Remote') {
+      return item.location.toLowerCase().includes('remote');
+    }
+    if (activeFilter === 'Nigeria') {
+      return item.location.toLowerCase().includes('nigeria');
+    }
+    if (activeFilter === 'Global') {
+      return item.location.toLowerCase().includes('global');
+    }
+    if (activeFilter === 'Frontend') {
+      return item.role.toLowerCase().includes('frontend');
+    }
+    if (activeFilter === 'Backend') {
+      return item.role.toLowerCase().includes('backend');
+    }
+    if (activeFilter === 'Data') {
+      return item.role.toLowerCase().includes('data');
+    }
+    if (activeFilter === 'AI') {
+      return item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm'));
+    }
+    return item.skillTags.some((tag) => tag.toLowerCase().includes(activeFilter.toLowerCase()));
+  });
 
   useEffect(() => {
     const sequence = Animated.stagger(
-      90,
-      cardAnimations.map((anim) =>
+      CARD_STAGGER_DELAY_MS,
+      Object.values(cardAnimations).map((anim) =>
         Animated.timing(anim, {
           toValue: 1,
-          duration: 420,
+          duration: CARD_ANIMATION_DURATION_MS,
           useNativeDriver: true,
         })
       )
@@ -34,7 +69,7 @@ export default function IntelligenceScreen() {
   useEffect(() => {
     const interval = setInterval(() => {
       setLoaderIndex((prev) => (prev + 1) % loadingStates.length);
-    }, 1900);
+    }, LOADING_STATE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [loadingStates.length]);
 
@@ -61,7 +96,7 @@ export default function IntelligenceScreen() {
             shadowOpacity: theme.appearance === 'dark' ? 0.38 : 0.14,
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>Good evening, Chijioke</Text>
+            <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{greeting}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
               <LivePulse theme={theme} />
               <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>Live scan</Text>
@@ -133,8 +168,8 @@ export default function IntelligenceScreen() {
         </ScrollView>
 
         <View style={{ gap: theme.spacing.md }}>
-          {intelligenceSignals.map((item, index) => {
-            const animation = cardAnimations[index];
+          {filteredSignals.map((item) => {
+            const animation = cardAnimations[item.id];
             const sourceExpanded = expandedSourceId === item.id;
             const saved = Boolean(savedIds[item.id]);
             return (
