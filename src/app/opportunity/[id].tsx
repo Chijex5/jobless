@@ -11,7 +11,7 @@ const SECTION_REVEAL_DURATION_MS = 360;
 const SOURCE_EXPAND_DURATION_MS = 220;
 const SOURCE_EXPANDED_MAX_HEIGHT = 420;
 const SCORE_PULSE_DURATION_MS = 1200;
-const SECTION_COUNT = 6;
+const REVEAL_SECTION_KEYS = ['header', 'insight', 'structured', 'actions', 'source', 'related'] as const;
 
 const getStrengthLabel = (score: number) => {
   if (score >= 90) {
@@ -35,7 +35,7 @@ export default function OpportunityDetailScreen() {
   const [interestState, setInterestState] = useState<'none' | 'interested' | 'not-relevant'>('none');
   const [sourceExpanded, setSourceExpanded] = useState(false);
 
-  const sectionAnimations = useRef(Array.from({ length: SECTION_COUNT }, () => new Animated.Value(0))).current;
+  const sectionAnimations = useRef(Array.from({ length: REVEAL_SECTION_KEYS.length }, () => new Animated.Value(0))).current;
   const sourceAnimation = useRef(new Animated.Value(0)).current;
   const scoreScale = useRef(new Animated.Value(1)).current;
   const scoreGlow = useRef(new Animated.Value(0.4)).current;
@@ -289,9 +289,13 @@ export default function OpportunityDetailScreen() {
             </Pressable>
             <Animated.View style={{ maxHeight: sourceHeight, opacity: sourceOpacity, overflow: 'hidden', gap: 8 }}>
               <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>{signal.originalSourceText}</Text>
-              <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>
-                {signal.sourceHandle} · {signal.sourceUrl}
-              </Text>
+              <Pressable onPress={() => Linking.openURL(signal.sourceUrl)}>
+                {({ pressed }) => (
+                  <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue, opacity: pressed ? 0.75 : 1 }}>
+                    {signal.sourceHandle} · {signal.sourceUrl}
+                  </Text>
+                )}
+              </Pressable>
               <View style={{ gap: 6 }}>
                 {signal.sourceMetadata.map((entry) => (
                   <Text key={`${signal.id}-${entry}`} style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>

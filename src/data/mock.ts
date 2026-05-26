@@ -275,9 +275,7 @@ export const getRelatedIntelligenceSignals = (id: string) => {
   if (!source) {
     return [];
   }
-  return source.relatedIds
-    .map((relatedId) => getIntelligenceSignalById(relatedId))
-    .filter((signal): signal is IntelligenceSignal => Boolean(signal));
+  return source.relatedIds.map((relatedId) => getIntelligenceSignalById(relatedId)).filter(Boolean) as IntelligenceSignal[];
 };
 
 export const monitorFeed = [

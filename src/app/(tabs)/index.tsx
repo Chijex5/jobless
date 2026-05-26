@@ -11,13 +11,17 @@ const CARD_ANIMATION_DURATION_MS = 420;
 const LOADING_STATE_INTERVAL_MS = 1900;
 const LOADING_STATES = ['Analyzing internship signals', 'Ranking opportunities', 'Scanning Twitter/X'];
 const FILTERS = ['Frontend', 'Backend', 'AI', 'Data', 'Remote', 'Nigeria', 'Global', 'React', 'Python'];
+const PROMPT_HINTS = [
+  'Find React internships in Nigeria with strong portfolio fit',
+  'Show remote AI internships with high confidence',
+  'Surface backend roles with API mentorship signals',
+];
 type Signal = (typeof intelligenceSignals)[number];
 
 const FILTER_STRATEGIES: Record<string, (signal: Signal) => boolean> = {
   Frontend: (item) => item.role.toLowerCase().includes('frontend'),
   Backend: (item) => item.role.toLowerCase().includes('backend'),
-  AI: (item) =>
-    item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm') || tag.toLowerCase().includes('ai')),
+  AI: (item) => item.role.toLowerCase().includes('ai') || item.skillTags.some((tag) => tag.toLowerCase().includes('llm')),
   Data: (item) => item.role.toLowerCase().includes('data'),
   Remote: (item) => item.location.toLowerCase().includes('remote'),
   Nigeria: (item) => item.location.toLowerCase().includes('nigeria'),
@@ -33,6 +37,7 @@ export default function IntelligenceScreen() {
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [scanningStateIndex, setScanningStateIndex] = useState(0);
+  const [promptHintIndex, setPromptHintIndex] = useState(0);
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
   const opportunityCount = intelligenceSignals.length;
@@ -74,6 +79,13 @@ export default function IntelligenceScreen() {
     const interval = setInterval(() => {
       setScanningStateIndex((prev) => (prev + 1) % LOADING_STATES.length);
     }, LOADING_STATE_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPromptHintIndex((prev) => (prev + 1) % PROMPT_HINTS.length);
+    }, 4200);
     return () => clearInterval(interval);
   }, []);
 
@@ -133,7 +145,7 @@ export default function IntelligenceScreen() {
             elevation: 2,
           }}>
           <Text style={{ ...theme.typography.body, color: theme.colors.textMuted }}>
-            ✦ Ask AI: “Find React internships in Nigeria with strong portfolio fit”
+            ✦ Ask AI: “{PROMPT_HINTS[promptHintIndex]}”
           </Text>
         </View>
 
