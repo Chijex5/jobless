@@ -1,51 +1,241 @@
-import { Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ScreenShell } from '@/components/screen-shell';
-import { AIInsightBlock, Card, Chip, SectionHeader } from '@/components/ui';
-import { internshipOpportunities } from '@/data/mock';
+import { Card, Chip, LivePulse } from '@/components/ui';
+import { intelligenceSignals } from '@/data/mock';
 import { useAppTheme } from '@/theme/use-app-theme';
 
 export default function IntelligenceScreen() {
   const theme = useAppTheme();
-  const topSignals = internshipOpportunities.slice(0, 2);
+  const [activeFilter, setActiveFilter] = useState('AI');
+  const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
+  const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
+  const [loaderIndex, setLoaderIndex] = useState(0);
+  const cardAnimations = useRef(intelligenceSignals.map(() => new Animated.Value(0))).current;
+
+  const loadingStates = ['Analyzing internship signals', 'Ranking opportunities', 'Scanning Twitter/X'];
+  const filters = ['Frontend', 'Backend', 'AI', 'Data', 'Remote', 'Nigeria', 'Global', 'React', 'Python'];
+  const opportunityCount = intelligenceSignals.length;
+
+  useEffect(() => {
+    const sequence = Animated.stagger(
+      90,
+      cardAnimations.map((anim) =>
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 420,
+          useNativeDriver: true,
+        })
+      )
+    );
+    sequence.start();
+  }, [cardAnimations]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLoaderIndex((prev) => (prev + 1) % loadingStates.length);
+    }, 1900);
+    return () => clearInterval(interval);
+  }, [loadingStates.length]);
+
+  const toggleSave = (id: string) => {
+    setSavedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
-    <ScreenShell
-      theme={theme}
-      title="Intelligence"
-      subtitle="AI-ranked internship radar sourced from real-time X/Twitter hiring signals.">
-      <Card theme={theme}>
-        <SectionHeader
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.md,
+          paddingTop: theme.spacing.lg,
+          paddingBottom: theme.spacing.xxl,
+          gap: theme.spacing.lg,
+        }}
+        showsVerticalScrollIndicator={false}>
+        <Card
           theme={theme}
-          title="Command Snapshot"
-          subtitle="Current system posture"
-          actionLabel="Refresh"
-        />
-        <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-          <Chip theme={theme} label="21 active signals" variant="blue" />
-          <Chip theme={theme} label="9 high confidence" variant="violet" />
-          <Chip theme={theme} label="3 priority alerts" variant="warning" />
+          style={{
+            gap: theme.spacing.md,
+            borderRadius: theme.radius.lg,
+            backgroundColor: theme.colors.surface,
+            shadowOpacity: theme.appearance === 'dark' ? 0.38 : 0.14,
+          }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>Good evening, Chijioke</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <LivePulse theme={theme} />
+              <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>Live scan</Text>
+            </View>
+          </View>
+          <Text style={{ ...theme.typography.h2, color: theme.colors.textPrimary }}>
+            {opportunityCount} new internship signals detected today
+          </Text>
+          <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
+            AI interpretation prioritized. Raw source confidence is continuously recalculated.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
+            <Chip theme={theme} label={loadingStates[loaderIndex]} variant="blue" />
+            <Chip theme={theme} label={`${opportunityCount} opportunities`} variant="violet" />
+          </View>
+        </Card>
+
+        <View
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.radius.lg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            shadowColor: theme.colors.accentBlue,
+            shadowOpacity: theme.appearance === 'dark' ? 0.22 : 0.12,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 8 },
+            elevation: 2,
+          }}>
+          <Text style={{ ...theme.typography.body, color: theme.colors.textMuted }}>
+            ✦ Ask AI: “Find React internships in Nigeria with strong portfolio fit”
+          </Text>
         </View>
-      </Card>
 
-      <SectionHeader theme={theme} title="AI Opportunity Insights" subtitle="Top ranked opportunities now" />
-      {topSignals.map((item) => (
-        <AIInsightBlock key={item.id} theme={theme} title={`${item.role} · ${item.company}`} summary={item.aiSummary} score={item.aiMatchScore} />
-      ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>
+          {filters.map((filter) => {
+            const selected = activeFilter === filter;
+            return (
+              <Pressable key={filter} onPress={() => setActiveFilter(filter)}>
+                {({ pressed }) => (
+                  <View
+                    style={{
+                      borderRadius: theme.radius.pill,
+                      paddingHorizontal: theme.spacing.sm,
+                      paddingVertical: 9,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: selected ? theme.colors.accentBlue : theme.colors.border,
+                      backgroundColor: selected
+                        ? `${theme.colors.accentBlue}28`
+                        : pressed
+                          ? theme.colors.surfaceElevated
+                          : theme.colors.surface,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    }}>
+                    <Text
+                      style={{
+                        ...theme.typography.meta,
+                        color: selected ? theme.colors.accentBlue : theme.colors.textSecondary,
+                      }}>
+                      {filter}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-      <SectionHeader theme={theme} title="High-Confidence Match" subtitle="Closest alignment detected" />
-      <Card theme={theme}>
-        <Text style={{ ...theme.typography.h2, color: theme.colors.textPrimary }}>
-          {internshipOpportunities[0].company}
-        </Text>
-        <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
-          {internshipOpportunities[0].role}
-        </Text>
-        <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-          {internshipOpportunities[0].location}
-        </Text>
-      </Card>
-    </ScreenShell>
+        <View style={{ gap: theme.spacing.md }}>
+          {intelligenceSignals.map((item, index) => {
+            const animation = cardAnimations[index];
+            const sourceExpanded = expandedSourceId === item.id;
+            const saved = Boolean(savedIds[item.id]);
+            return (
+              <Animated.View
+                key={item.id}
+                style={{
+                  opacity: animation,
+                  transform: [
+                    {
+                      translateY: animation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [16, 0],
+                      }),
+                    },
+                  ],
+                }}>
+                <Card theme={theme} style={{ gap: theme.spacing.md, borderRadius: theme.radius.lg }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{item.role}</Text>
+                      <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
+                        {item.company} · {item.location}
+                      </Text>
+                    </View>
+                    <Chip theme={theme} label={`${item.aiMatchScore}% match`} variant="violet" />
+                  </View>
+
+                  <View
+                    style={{
+                      borderRadius: theme.radius.md,
+                      backgroundColor: `${theme.colors.accentBlue}14`,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: `${theme.colors.accentBlue}66`,
+                      padding: theme.spacing.sm,
+                    }}>
+                    <Text style={{ ...theme.typography.body, color: theme.colors.textPrimary }}>{item.aiSummary}</Text>
+                  </View>
+
+                  <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>Detected {item.postedAt}</Text>
+
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {item.skillTags.map((tag) => (
+                      <Chip key={`${item.id}-${tag}`} theme={theme} label={tag} />
+                    ))}
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                    <Pressable onPress={() => toggleSave(item.id)} style={{ flex: 1 }}>
+                      {({ pressed }) => (
+                        <View
+                          style={{
+                            alignItems: 'center',
+                            borderRadius: theme.radius.md,
+                            paddingVertical: 10,
+                            borderWidth: StyleSheet.hairlineWidth,
+                            borderColor: theme.colors.border,
+                            backgroundColor: pressed ? theme.colors.surfaceElevated : theme.colors.surfaceStrong,
+                            transform: [{ scale: pressed ? 0.985 : 1 }],
+                          }}>
+                          <Text style={{ ...theme.typography.meta, color: theme.colors.textPrimary }}>
+                            {saved ? 'Saved' : 'Save'}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                    <Pressable style={{ flex: 1 }}>
+                      {({ pressed }) => (
+                        <View
+                          style={{
+                            alignItems: 'center',
+                            borderRadius: theme.radius.md,
+                            paddingVertical: 10,
+                            backgroundColor: pressed ? `${theme.colors.accentBlue}CC` : theme.colors.accentBlue,
+                            transform: [{ scale: pressed ? 0.985 : 1 }],
+                          }}>
+                          <Text style={{ ...theme.typography.meta, color: theme.colors.surface }}>View details</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  <Pressable onPress={() => setExpandedSourceId(sourceExpanded ? null : item.id)}>
+                    {({ pressed }) => (
+                      <View style={{ gap: 6, opacity: pressed ? 0.85 : 1 }}>
+                        <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+                          Raw source {sourceExpanded ? '▲' : '▼'}
+                        </Text>
+                        {sourceExpanded ? (
+                          <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
+                            {item.sourcePostPreview}
+                          </Text>
+                        ) : null}
+                      </View>
+                    )}
+                  </Pressable>
+                </Card>
+              </Animated.View>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
-

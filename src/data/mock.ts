@@ -14,6 +14,18 @@ export type InternshipOpportunity = {
   notificationState: NotificationState;
 };
 
+export type IntelligenceSignal = {
+  id: string;
+  role: string;
+  company: string;
+  location: string;
+  aiMatchScore: number;
+  postedAt: string;
+  aiSummary: string;
+  skillTags: string[];
+  sourcePostPreview: string;
+};
+
 export const internshipOpportunities: InternshipOpportunity[] = [
   {
     id: 'sig-204',
@@ -73,6 +85,87 @@ export const internshipOpportunities: InternshipOpportunity[] = [
   },
 ];
 
+export const intelligenceSignals: IntelligenceSignal[] = [
+  {
+    id: 'intel-1',
+    role: 'Frontend Engineering Intern',
+    company: 'Paystack',
+    location: 'Lagos, Nigeria · Hybrid',
+    aiMatchScore: 94,
+    postedAt: '6m ago',
+    aiSummary:
+      'Strong match for React-focused frontend developers with portfolio experience and responsive UI execution.',
+    skillTags: ['React', 'TypeScript', 'UI Engineering'],
+    sourcePostPreview:
+      'We are opening internship slots for frontend engineers who can ship polished product surfaces quickly.',
+  },
+  {
+    id: 'intel-2',
+    role: 'Backend Intern',
+    company: 'Moniepoint',
+    location: 'Abuja, Nigeria · Onsite',
+    aiMatchScore: 86,
+    postedAt: '18m ago',
+    aiSummary:
+      'Good fit for API-first candidates comfortable with scalable backend systems and production debugging.',
+    skillTags: ['Node.js', 'PostgreSQL', 'APIs'],
+    sourcePostPreview:
+      'Hiring backend interns to support transaction APIs, reliability tooling, and internal platform services.',
+  },
+  {
+    id: 'intel-3',
+    role: 'AI Engineering Intern',
+    company: 'Hugging Face',
+    location: 'Remote · Global',
+    aiMatchScore: 91,
+    postedAt: '29m ago',
+    aiSummary:
+      'High alignment for Python builders with model experimentation skills and open-source collaboration habits.',
+    skillTags: ['Python', 'LLMs', 'MLOps'],
+    sourcePostPreview:
+      'Looking for AI engineering interns to prototype model workflows and contribute to tooling used by the community.',
+  },
+  {
+    id: 'intel-4',
+    role: 'Data Science Intern',
+    company: 'Andela',
+    location: 'Remote · Africa',
+    aiMatchScore: 82,
+    postedAt: '47m ago',
+    aiSummary:
+      'Relevant for data-focused applicants who can turn noisy datasets into clear business signals for teams.',
+    skillTags: ['Python', 'SQL', 'Experimentation'],
+    sourcePostPreview:
+      'Data internship opening focused on analytics pipelines, forecasting, and experimentation support.',
+  },
+  {
+    id: 'intel-5',
+    role: 'Software Engineering Intern',
+    company: 'Flutterwave',
+    location: 'Lagos, Nigeria · Hybrid',
+    aiMatchScore: 78,
+    postedAt: '1h ago',
+    aiSummary:
+      'Moderate match for full-stack candidates with shipping experience and strong communication in cross-team projects.',
+    skillTags: ['React', 'Go', 'Testing'],
+    sourcePostPreview:
+      'Internship applications now open for engineers interested in fintech infrastructure and developer productivity.',
+  },
+  {
+    id: 'intel-6',
+    role: 'Frontend Intern',
+    company: 'Vercel',
+    location: 'Remote · Global',
+    aiMatchScore: 89,
+    postedAt: '1h 22m ago',
+    aiSummary:
+      'Very strong for frontend candidates who already build high-performance React interfaces and care about DX.',
+    skillTags: ['React', 'Next.js', 'Performance'],
+    sourcePostPreview:
+      'Seeking frontend interns excited by web performance, product polish, and collaborative experimentation.',
+  },
+];
+
 export const monitorFeed = [
   {
     id: 'm-1',
@@ -102,4 +195,3 @@ export const queueStats = [
   { id: 'q2', label: 'Needs review', value: 14 },
   { id: 'q3', label: 'Submitted', value: 6 },
 ];
-
