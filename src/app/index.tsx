@@ -126,11 +126,11 @@ const timeline = Array.from({ length: 42 }, (_, index) => ({
 const streamBars = [38, 54, 48, 72, 62, 88, 76, 96, 68, 74, 58, 82];
 const moodBars = [68, 46, 78, 56, 84, 62, 72, 42];
 const releaseYears = [
-  { label: '08', value: 38 },
-  { label: '12', value: 64 },
-  { label: '16', value: 82 },
-  { label: '20', value: 58 },
-  { label: '24', value: 76 },
+  { label: '08', height: 38 },
+  { label: '12', height: 64 },
+  { label: '16', height: 82 },
+  { label: '20', height: 58 },
+  { label: '24', height: 76 },
 ];
 
 export default function DashboardScreen() {
@@ -410,7 +410,7 @@ function VisualAnalytics() {
           <View style={styles.yearBars}>
             {releaseYears.map((year) => (
               <View key={year.label} style={styles.yearItem}>
-                <View style={[styles.yearBar, { height: year.value }]} />
+                <View style={[styles.yearBar, { height: year.height }]} />
                 <Text style={styles.tinyText}>{year.label}</Text>
               </View>
             ))}
