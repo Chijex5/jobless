@@ -130,7 +130,7 @@ export const intelligenceSignals: IntelligenceSignal[] = [
     id: 'intel-2',
     role: 'Backend Intern',
     company: 'Moniepoint',
-    location: 'Abuja, Nigeria · Onsite',
+    location: 'Abuja, Nigeria · On-site',
     aiMatchScore: 86,
     postedAt: '18m ago',
     aiSummary:
