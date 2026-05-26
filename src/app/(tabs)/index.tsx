@@ -31,7 +31,7 @@ export default function IntelligenceScreen() {
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
-  const [loaderIndex, setLoaderIndex] = useState(0);
+  const [scanningStateIndex, setScanningStateIndex] = useState(0);
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
   const opportunityCount = intelligenceSignals.length;
@@ -71,7 +71,7 @@ export default function IntelligenceScreen() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLoaderIndex((prev) => (prev + 1) % LOADING_STATES.length);
+      setScanningStateIndex((prev) => (prev + 1) % LOADING_STATES.length);
     }, LOADING_STATE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
@@ -115,7 +115,7 @@ export default function IntelligenceScreen() {
             AI interpretation prioritized. Raw source confidence is continuously recalculated.
           </Text>
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-            <Chip theme={theme} label={LOADING_STATES[loaderIndex]} variant="blue" />
+            <Chip theme={theme} label={LOADING_STATES[scanningStateIndex]} variant="blue" />
             <Chip theme={theme} label={`${opportunityCount} opportunities`} variant="violet" />
           </View>
         </Card>
@@ -179,6 +179,7 @@ export default function IntelligenceScreen() {
             const sourceExpanded = expandedSourceId === item.id;
             const detailsExpanded = expandedDetailId === item.id;
             const saved = Boolean(savedIds[item.id]);
+            const [primaryTag, secondaryTag] = item.skillTags;
             return (
               <Animated.View
                 key={item.id}
@@ -233,7 +234,8 @@ export default function IntelligenceScreen() {
                         backgroundColor: theme.colors.surfaceStrong,
                       }}>
                       <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-                        Why it stands out: high signal alignment for {item.skillTags[0]} and {item.skillTags[1]} readiness.
+                        Why it stands out: high signal alignment for {primaryTag}
+                        {secondaryTag ? ` and ${secondaryTag}` : ''} readiness.
                       </Text>
                       <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
                         Suggested next action: tailor your resume for {item.role} outcomes and share 1 project proof point.
