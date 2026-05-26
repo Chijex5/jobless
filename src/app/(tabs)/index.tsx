@@ -8,6 +8,8 @@ import { useAppTheme } from '@/theme/use-app-theme';
 const CARD_STAGGER_DELAY_MS = 90;
 const CARD_ANIMATION_DURATION_MS = 420;
 const LOADING_STATE_INTERVAL_MS = 1900;
+const LOADING_STATES = ['Analyzing internship signals', 'Ranking opportunities', 'Scanning Twitter/X'];
+const FILTERS = ['Frontend', 'Backend', 'AI', 'Data', 'Remote', 'Nigeria', 'Global', 'React', 'Python'];
 type Signal = (typeof intelligenceSignals)[number];
 
 const FILTER_STRATEGIES: Record<string, (signal: Signal) => boolean> = {
@@ -32,11 +34,11 @@ export default function IntelligenceScreen() {
   const [loaderIndex, setLoaderIndex] = useState(0);
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
-  const loadingStates = ['Analyzing internship signals', 'Ranking opportunities', 'Scanning Twitter/X'];
-  const filters = ['Frontend', 'Backend', 'AI', 'Data', 'Remote', 'Nigeria', 'Global', 'React', 'Python'];
   const opportunityCount = intelligenceSignals.length;
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  }, []);
   const getCardAnimation = useCallback(
     (id: string) => {
       if (!cardAnimations[id]) {
@@ -69,10 +71,10 @@ export default function IntelligenceScreen() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setLoaderIndex((prev) => (prev + 1) % loadingStates.length);
+      setLoaderIndex((prev) => (prev + 1) % LOADING_STATES.length);
     }, LOADING_STATE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [loadingStates.length]);
+  }, []);
 
   const toggleSave = (id: string) => {
     setSavedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -113,7 +115,7 @@ export default function IntelligenceScreen() {
             AI interpretation prioritized. Raw source confidence is continuously recalculated.
           </Text>
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-            <Chip theme={theme} label={loadingStates[loaderIndex]} variant="blue" />
+            <Chip theme={theme} label={LOADING_STATES[loaderIndex]} variant="blue" />
             <Chip theme={theme} label={`${opportunityCount} opportunities`} variant="violet" />
           </View>
         </Card>
@@ -138,7 +140,7 @@ export default function IntelligenceScreen() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.sm }}>
-          {filters.map((filter) => {
+          {FILTERS.map((filter) => {
             const selected = activeFilter === filter;
             return (
               <Pressable key={filter} onPress={() => setActiveFilter(filter)}>
@@ -231,10 +233,10 @@ export default function IntelligenceScreen() {
                         backgroundColor: theme.colors.surfaceStrong,
                       }}>
                       <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-                        {item.company} · {item.location}
+                        Why it stands out: high signal alignment for {item.skillTags[0]} and {item.skillTags[1]} readiness.
                       </Text>
                       <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-                        AI match score: {item.aiMatchScore}% · Detected {item.postedAt}
+                        Suggested next action: tailor your resume for {item.role} outcomes and share 1 project proof point.
                       </Text>
                     </View>
                   ) : null}
