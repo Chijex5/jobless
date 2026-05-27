@@ -17,6 +17,7 @@ export type ThemePalette = {
   accentSuccess: string;
   accentWarning: string;
   accentError: string;
+  accentRose: string;
 };
 
 const spacing = {
@@ -46,37 +47,46 @@ const typography = {
 };
 
 const darkPalette: ThemePalette = {
-  background: '#111110',
-  surface: '#1C1C1A',
-  surfaceStrong: '#242422',
-  surfaceElevated: '#2E2E2B',
-  textPrimary: '#EEEDE9',
-  textSecondary: '#A09F9B',
-  textMuted: '#6F6E6A',
-  border: '#2E2E2B',
+  background: '#0F1115',
+  surface: '#17191E',
+  surfaceStrong: '#1D2128',
+  surfaceElevated: '#252A33',
+  textPrimary: '#F3F4F6',
+  textSecondary: '#B2B8C2',
+  textMuted: '#7A808A',
+  border: '#2A303A',
   shadow: '#000000',
-  accentBlue: '#5B8AF0',
-  accentViolet: '#9B7FEA',
-  accentSuccess: '#3EBD8A',
-  accentWarning: '#E8A838',
-  accentError: '#E85C5C',
+  accentBlue: '#6EA8FE',
+  accentViolet: '#A78BFA',
+  accentSuccess: '#4ADE80',
+  accentWarning: '#FBBF24',
+  accentError: '#EF4444',
+  accentRose: '#d15c5c',
 };
 
 const lightPalette: ThemePalette = {
-  background: '#F8F7F4',
+  background: '#F7F8FA',
   surface: '#FFFFFF',
-  surfaceStrong: '#F2F1EE',
-  surfaceElevated: '#ECEAE5',
-  textPrimary: '#1A1917',
-  textSecondary: '#4A4845',
-  textMuted: '#8A8884',
-  border: '#E4E2DC',
-  shadow: '#C4C2BC',
-  accentBlue: '#3D6FE8',
-  accentViolet: '#7B5DD6',
-  accentSuccess: '#28A372',
-  accentWarning: '#C4831A',
-  accentError: '#C43B3B',
+  surfaceStrong: '#F1F3F5',
+  surfaceElevated: '#E8EBEF',
+
+  textPrimary: '#121417',
+  textSecondary: '#4E5662',
+  textMuted: '#8A9099',
+
+  border: '#E3E7EC',
+  shadow: '#00000010',
+
+  accentBlue: '#4F7DF3',
+  accentViolet: '#8B7CF6',
+
+  accentSuccess: '#22C55E',
+  accentWarning: '#EAA21B',
+
+  accentError: '#DC2626',
+
+  // your favorite color
+  accentRose: '#d15c5c',
 };
 
 export type AppTheme = {

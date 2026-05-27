@@ -8,7 +8,7 @@ const chipVariants: Record<Variant, (theme: AppTheme) => { bg: string; fg: strin
   default: (theme) => ({ bg: theme.colors.surfaceStrong, fg: theme.colors.textSecondary }),
   blue: (theme) => ({ bg: `${theme.colors.accentBlue}22`, fg: theme.colors.accentBlue }),
   violet: (theme) => ({ bg: `${theme.colors.accentViolet}22`, fg: theme.colors.accentViolet }),
-  success: (theme) => ({ bg: `${theme.colors.accentSuccess}22`, fg: theme.colors.accentSuccess }),
+  success: (theme) => ({ bg: `${theme.colors.accentRose}22`, fg: theme.colors.accentRose }),
   warning: (theme) => ({ bg: `${theme.colors.accentWarning}22`, fg: theme.colors.accentWarning }),
 };
 

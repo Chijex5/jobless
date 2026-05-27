@@ -53,13 +53,13 @@ function stageColor(stage: PipelineStage, theme: AppTheme): string {
     case 'saved': return theme.colors.accentBlue;
     case 'applied': return theme.colors.accentViolet;
     case 'interviewing': return theme.colors.accentWarning;
-    case 'offered': return theme.colors.accentSuccess;
+    case 'offered': return theme.colors.accentRose;
     case 'rejected': return '#E5484D';
   }
 }
 
 function scoreColor(score: number, theme: AppTheme): string {
-  if (score >= 90) return theme.colors.accentSuccess;
+  if (score >= 90) return theme.colors.accentRose;
   if (score >= 80) return theme.colors.accentBlue;
   if (score >= 70) return theme.colors.accentViolet;
   return theme.colors.textMuted;
@@ -411,7 +411,7 @@ function StatsBar({ items, theme }: { items: QueueItem[]; theme: AppTheme }) {
       <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border, marginVertical: 4 }} />
       <Stat label="Active" value={active} color={theme.colors.accentWarning} />
       <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border, marginVertical: 4 }} />
-      <Stat label="Offers" value={offered} color={theme.colors.accentSuccess} />
+      <Stat label="Offers" value={offered} color={theme.colors.accentRose} />
     </View>
   );
 }
@@ -818,15 +818,15 @@ function OfferedBanner({ items, theme }: { items: QueueItem[]; theme: AppTheme }
   return (
     <View
       style={{
-        backgroundColor: `${theme.colors.accentSuccess}10`,
+        backgroundColor: `${theme.colors.accentRose}10`,
         borderRadius: theme.radius.md,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: `${theme.colors.accentSuccess}30`,
+        borderColor: `${theme.colors.accentRose}30`,
         padding: 14,
         gap: 4,
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.accentSuccess }}>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.accentRose }}>
         🎉 {items.length === 1 ? 'You have an offer!' : `You have ${items.length} offers!`}
       </Text>
       <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>

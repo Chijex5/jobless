@@ -44,7 +44,7 @@ function getStrengthLabel(score: number): string {
 }
 
 function scoreColor(score: number, theme: AppTheme): string {
-  if (score >= 90) return theme.colors.accentSuccess;
+  if (score >= 90) return theme.colors.accentRose;
   if (score >= 80) return theme.colors.accentBlue;
   if (score >= 70) return theme.colors.accentViolet;
   return theme.colors.textMuted;
@@ -781,7 +781,7 @@ export default function OpportunityDetailScreen() {
                 label={signal.roleMode ?? "On-site"}
                 color={
                   signal.roleMode === "Remote"
-                    ? theme.colors.accentSuccess
+                    ? theme.colors.accentRose
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -790,7 +790,7 @@ export default function OpportunityDetailScreen() {
                 label={signal.applicationStatus}
                 color={
                   signal.applicationStatus === "Open"
-                    ? theme.colors.accentSuccess
+                    ? theme.colors.accentRose
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -913,7 +913,7 @@ export default function OpportunityDetailScreen() {
                 }
                 color={
                   signal.sourceConfidence === "High"
-                    ? theme.colors.accentSuccess
+                    ? theme.colors.accentRose
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -1039,11 +1039,11 @@ export default function OpportunityDetailScreen() {
                       borderWidth: StyleSheet.hairlineWidth,
                       borderColor:
                         interestState === "interested"
-                          ? theme.colors.accentSuccess
+                          ? theme.colors.accentRose
                           : theme.colors.border,
                       backgroundColor:
                         interestState === "interested"
-                          ? `${theme.colors.accentSuccess}12`
+                          ? `${theme.colors.accentRose}12`
                           : pressed
                             ? theme.colors.surfaceStrong
                             : "transparent",
@@ -1056,7 +1056,7 @@ export default function OpportunityDetailScreen() {
                         fontWeight: "600",
                         color:
                           interestState === "interested"
-                            ? theme.colors.accentSuccess
+                            ? theme.colors.accentRose
                             : theme.colors.textSecondary,
                       }}
                     >
