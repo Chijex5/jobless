@@ -14,12 +14,22 @@ export type InternshipOpportunity = {
   notificationState: NotificationState;
 };
 
+export  type PipelineStage = {
+  "new" : string;
+  saved : string;
+  applied : string;
+  interviewing : string;
+  offered : string;
+  rejected : string;
+}
+
 export type IntelligenceSignal = {
   id: string;
   role: string;
   company: string;
   location: string;
   aiMatchScore: number;
+  status?:  string;
   postedAt: string;
   aiSummary: string;
   skillTags: string[];
@@ -34,6 +44,7 @@ export type IntelligenceSignal = {
   applicationStatus: 'Open' | 'Closing soon' | 'Unknown';
   sourceConfidence: 'High' | 'Medium' | 'Low';
   originalSourceText: string;
+  platform?: string | null;
   sourceMetadata: string[];
   relatedIds: string[];
 };
