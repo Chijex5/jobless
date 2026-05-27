@@ -1,328 +1,260 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  UIManager,
-  View,
-} from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Card, LivePulse, SectionHeader } from '@/components/ui';
+import { Card, SectionHeader } from '@/components/ui';
 import { useAppTheme } from '@/theme/use-app-theme';
 
-const TREND_CARDS = [
+type NotificationCategory =
+  | 'High Match Opportunity'
+  | 'Trending Opportunity'
+  | 'Deadline Alert'
+  | 'AI Insight Alert'
+  | 'System Activity'
+  | 'Queue Reminder';
+
+type NotificationPriority = 'high' | 'medium' | 'low';
+
+type NotificationItem = {
+  id: string;
+  section: 'Today' | 'Earlier This Week' | 'Intelligence Updates' | 'Opportunity Alerts' | 'System Activity';
+  title: string;
+  context: string;
+  time: string;
+  category: NotificationCategory;
+  priority: NotificationPriority;
+  matchScore?: number;
+  urgency?: string;
+  actions: string[];
+};
+
+const NOTIFICATIONS: NotificationItem[] = [
   {
-    id: 'skills',
-    title: 'Trending Skills',
-    summary: 'Demand concentration in product-facing engineering internships.',
-    items: [
-      { label: 'React', change: 32, detail: 'UI-heavy internship posts continue to rise across global startup teams.' },
-      { label: 'Python', change: 28, detail: 'Data and automation internship roles remain consistently active.' },
-      { label: 'AI/ML', change: 41, detail: 'AI research and model-ops internships show the strongest growth this week.' },
-    ],
+    id: 'n1',
+    section: 'Today',
+    title: 'New frontend internship detected — 94% match',
+    context: 'Signal mapped your React + TypeScript profile to a remote startup role with strong mentor coverage.',
+    time: '9:14 AM',
+    category: 'High Match Opportunity',
+    priority: 'high',
+    matchScore: 94,
+    actions: ['Save', 'Open', 'Mark important', 'Mute similar'],
   },
   {
-    id: 'companies',
-    title: 'Active Companies',
-    summary: 'Hiring spikes led by fast-moving startups and AI product teams.',
-    items: [
-      {
-        label: 'Startups (AI-first)',
-        change: 35,
-        detail: 'Seed to Series B teams are posting internship roles aggressively for product velocity.',
-      },
-      {
-        label: 'Fintech (Nigeria)',
-        change: 27,
-        detail: 'Lagos and Abuja fintechs are expanding internship hiring across frontend and backend tracks.',
-      },
-      {
-        label: 'Global Big Tech',
-        change: 16,
-        detail: 'Large platforms are reopening internship cohorts with tighter role requirements.',
-      },
-    ],
+    id: 'n2',
+    section: 'Today',
+    title: 'Application deadline approaching in 24 hours',
+    context: 'Berlin AI product internship closes tomorrow. You marked it as interested on May 24.',
+    time: '8:02 AM',
+    category: 'Deadline Alert',
+    priority: 'high',
+    urgency: '24h',
+    actions: ['Open', 'Save', 'Dismiss'],
   },
   {
-    id: 'movement',
-    title: 'Market Movement',
-    summary: 'Role patterns indicate a continued shift toward AI-enabled remote work.',
-    items: [
-      { label: 'Remote internships', change: 24, detail: 'Cross-border internship sourcing is increasing in engineering roles.' },
-      {
-        label: 'AI internships',
-        change: 39,
-        detail: 'AI tooling, model evaluation, and applied LLM roles are accelerating fastest.',
-      },
-      {
-        label: 'Traditional roles',
-        change: -14,
-        detail: 'Generalist non-specialized internship postings are trending downward this cycle.',
-      },
-    ],
-  },
-] as const;
-
-const INSIGHTS = [
-  {
-    id: 'insight-1',
-    title: 'AI startups show highest internship activity this week',
-    detail: 'Early-stage AI startups now account for the largest share of new internship postings in this monitoring window.',
-    confidence: 'High confidence',
+    id: 'n3',
+    section: 'Today',
+    title: 'This AI startup internship is gaining attention quickly',
+    context: 'View velocity is up 38% since yesterday among candidates with frontend + LLM stack keywords.',
+    time: '7:47 AM',
+    category: 'Trending Opportunity',
+    priority: 'medium',
+    actions: ['Open', 'Mark important', 'Mute similar'],
   },
   {
-    id: 'insight-2',
-    title: 'Frontend internships are 18% more competitive',
-    detail: 'Applicant-to-opening pressure is strongest in frontend tracks, especially for React + TypeScript profiles.',
-    confidence: 'Moderate confidence',
+    id: 'n4',
+    section: 'Earlier This Week',
+    title: 'You marked this role as interested 3 days ago',
+    context: 'Remote frontend internship at a seed-stage fintech startup has not been submitted yet.',
+    time: 'Mon · 4:42 PM',
+    category: 'Queue Reminder',
+    priority: 'medium',
+    actions: ['Open', 'Dismiss'],
   },
   {
-    id: 'insight-3',
-    title: 'Remote roles dominate current postings',
-    detail: 'Remote internship options continue to lead globally, with Nigeria-origin candidates seeing wider access to international roles.',
-    confidence: 'High confidence',
+    id: 'n5',
+    section: 'Intelligence Updates',
+    title: 'React internships increased 21% this week',
+    context: 'Growth is concentrated in product-led AI companies hiring interns for web interface and workflow tooling.',
+    time: 'Mon · 11:10 AM',
+    category: 'AI Insight Alert',
+    priority: 'high',
+    actions: ['Open', 'Save'],
   },
   {
-    id: 'insight-4',
-    title: 'Nigeria fintech internships continue upward momentum',
-    detail: 'Regional signal clustering indicates sustained growth in fintech engineering intern demand across Lagos and Abuja.',
-    confidence: 'Moderate confidence',
+    id: 'n6',
+    section: 'Opportunity Alerts',
+    title: '3 new remote internships match your interests',
+    context: 'All three roles mention modern frontend stack + AI collaboration features in their internship scope.',
+    time: 'Sun · 3:20 PM',
+    category: 'High Match Opportunity',
+    priority: 'high',
+    matchScore: 89,
+    actions: ['Open', 'Save', 'Mute similar'],
   },
-] as const;
+  {
+    id: 'n7',
+    section: 'System Activity',
+    title: 'Twitter scanner detected 12 new opportunities',
+    context: 'Signal ingested startup internship posts and filtered 4 as potential high-signal matches for your profile.',
+    time: 'Sun · 10:32 AM',
+    category: 'System Activity',
+    priority: 'low',
+    actions: ['Dismiss'],
+  },
+];
 
-const DARK_TREND_ROW_TINT = '90';
-const DARK_INSIGHT_CARD_TINT = 'D8';
-const PERCENT_ANIMATION_DURATION_MS = 760;
-const PERCENT_ANIMATION_STEPS = 24;
-
-type AppTheme = ReturnType<typeof useAppTheme>;
-type TrendItem = (typeof TREND_CARDS)[number]['items'][number];
-
-function AnimatedChange({ value, theme }: { value: number; theme: AppTheme }) {
-  const progress = useRef(new Animated.Value(0)).current;
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    progress.stopAnimation();
-    progress.setValue(0);
-    setDisplayValue(0);
-
-    const animation = Animated.timing(progress, {
-      toValue: 1,
-      duration: PERCENT_ANIMATION_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    });
-
-    animation.start();
-
-    let step = 0;
-    const timer = setInterval(() => {
-      step += 1;
-      setDisplayValue(Math.round((value * step) / PERCENT_ANIMATION_STEPS));
-      if (step >= PERCENT_ANIMATION_STEPS) {
-        clearInterval(timer);
-      }
-    }, Math.round(PERCENT_ANIMATION_DURATION_MS / PERCENT_ANIMATION_STEPS));
-
-    return () => {
-      clearInterval(timer);
-      progress.stopAnimation();
-    };
-  }, [progress, value]);
-
-  const width = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', `${Math.min(Math.abs(value), 100)}%`],
-  });
-
-  const isPositive = value >= 0;
-  const barColor = isPositive ? theme.colors.accentBlue : theme.colors.accentWarning;
-
-  return (
-    <View style={{ gap: 6 }}>
-      <Text
-        style={{
-          ...theme.typography.h3,
-          color: isPositive ? theme.colors.accentBlue : theme.colors.accentWarning,
-        }}>
-        {isPositive ? '+' : ''}
-        {displayValue}%
-      </Text>
-      <View
-        style={{
-          height: 6,
-          borderRadius: theme.radius.pill,
-          backgroundColor: theme.colors.surfaceStrong,
-          overflow: 'hidden',
-        }}>
-        <Animated.View
-          style={{
-            height: '100%',
-            width,
-            backgroundColor: barColor,
-            borderRadius: theme.radius.pill,
-          }}
-        />
-      </View>
-    </View>
-  );
-}
-
-function TrendRow({
-  item,
-  theme,
-  expanded,
-}: {
-  item: TrendItem;
-  theme: AppTheme;
-  expanded: boolean;
-}) {
-  return (
-    <View
-      style={{
-        gap: theme.spacing.xs,
-        padding: theme.spacing.sm,
-        borderRadius: theme.radius.md,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor:
-          theme.appearance === 'dark' ? `${theme.colors.surfaceElevated}${DARK_TREND_ROW_TINT}` : theme.colors.surface,
-      }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm, alignItems: 'center' }}>
-        <Text style={{ ...theme.typography.body, color: theme.colors.textPrimary, flex: 1 }}>{item.label}</Text>
-        <View style={{ minWidth: 92 }}>
-          <AnimatedChange value={item.change} theme={theme} />
-        </View>
-      </View>
-      {expanded ? <Text style={{ ...theme.typography.meta, color: theme.colors.textSecondary }}>{item.detail}</Text> : null}
-    </View>
-  );
-}
+const SECTION_ORDER: NotificationItem['section'][] = [
+  'Today',
+  'Earlier This Week',
+  'Intelligence Updates',
+  'Opportunity Alerts',
+  'System Activity',
+];
 
 export default function SignalsScreen() {
   const theme = useAppTheme();
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(
-    TREND_CARDS.length > 0 ? TREND_CARDS[0].id : null
-  );
+  const [importantIds, setImportantIds] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+  const grouped = useMemo(() => {
+    const map = new Map<NotificationItem['section'], NotificationItem[]>();
+    for (const section of SECTION_ORDER) {
+      map.set(section, []);
     }
+    for (const item of NOTIFICATIONS) {
+      map.get(item.section)?.push(item);
+    }
+    return map;
   }, []);
 
-  const topPanelBackground = useMemo(
-    () => (theme.appearance === 'dark' ? `${theme.colors.accentBlue}14` : theme.colors.surface),
-    [theme.appearance, theme.colors.accentBlue, theme.colors.surface]
-  );
+  const priorityStyles = (priority: NotificationPriority) => {
+    if (priority === 'high') {
+      return {
+        borderColor: `${theme.colors.accentViolet}7A`,
+        glow: theme.appearance === 'dark' ? 0.32 : 0.14,
+        tint: theme.appearance === 'dark' ? `${theme.colors.accentBlue}18` : `${theme.colors.accentBlue}10`,
+      };
+    }
 
-  const glowShadow = theme.appearance === 'dark' ? theme.colors.accentBlue : theme.colors.shadow;
+    if (priority === 'medium') {
+      return {
+        borderColor: theme.colors.border,
+        glow: theme.appearance === 'dark' ? 0.2 : 0.08,
+        tint: theme.appearance === 'dark' ? `${theme.colors.surfaceElevated}66` : theme.colors.surface,
+      };
+    }
 
-  const toggleCard = (id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedCardId((current) => (current === id ? null : id));
+    return {
+      borderColor: theme.colors.border,
+      glow: 0.05,
+      tint: theme.appearance === 'dark' ? `${theme.colors.surface}D9` : theme.colors.surfaceStrong,
+    };
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.md,
           paddingTop: theme.spacing.lg,
           paddingBottom: theme.spacing.xxl,
           gap: theme.spacing.lg,
-        }}
-        showsVerticalScrollIndicator={false}>
-        <Card
-          theme={theme}
-          style={{
-            gap: theme.spacing.md,
-            borderRadius: theme.radius.lg,
-            backgroundColor: topPanelBackground,
-            shadowColor: glowShadow,
-            shadowOpacity: theme.appearance === 'dark' ? 0.32 : 0.12,
-            shadowRadius: 18,
-            shadowOffset: { width: 0, height: 10 },
-            elevation: 2,
-          }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm, alignItems: 'center' }}>
-            <View style={{ gap: 4, flex: 1 }}>
-              <Text style={{ ...theme.typography.h1, color: theme.colors.textPrimary }}>Signals</Text>
-              <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
-                AI-generated internship intelligence trends
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-              <LivePulse theme={theme} />
-              <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>Updated moments ago</Text>
-            </View>
+        }}>
+        <Card theme={theme} style={{ gap: theme.spacing.sm, borderRadius: theme.radius.lg }}>
+          <Text style={{ ...theme.typography.h1, color: theme.colors.textPrimary }}>Signal Notifications</Text>
+          <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
+            Quiet intelligence alerts for internships: high-signal, low-noise, and timed for action.
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm }}>
+            <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>Push tone: calm and concise</Text>
+            <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>7 meaningful alerts this week</Text>
           </View>
         </Card>
 
-        <SectionHeader theme={theme} title="Trend Intelligence" subtitle="Patterns across skills, hiring behavior, and market movement" />
+        {SECTION_ORDER.map((section) => {
+          const items = grouped.get(section) ?? [];
+          if (items.length === 0) {
+            return null;
+          }
 
-        <View style={{ gap: theme.spacing.md }}>
-          {TREND_CARDS.map((card) => {
-            const expanded = expandedCardId === card.id;
-            return (
-              <Pressable key={card.id} onPress={() => toggleCard(card.id)}>
-                {({ pressed }) => (
+          return (
+            <View key={section} style={{ gap: theme.spacing.sm }}>
+              <SectionHeader
+                theme={theme}
+                title={section}
+                subtitle={section === 'Today' ? 'Important updates surfaced in real time' : 'Prioritized by relevance and urgency'}
+              />
+              {items.map((item) => {
+                const priority = priorityStyles(item.priority);
+                const isImportant = importantIds.includes(item.id);
+
+                return (
                   <Card
+                    key={item.id}
                     theme={theme}
                     style={{
+                      gap: theme.spacing.xs,
                       borderRadius: theme.radius.lg,
-                      gap: theme.spacing.sm,
-                      borderColor: expanded ? `${theme.colors.accentBlue}7A` : theme.colors.border,
-                      shadowColor: expanded ? theme.colors.accentBlue : theme.colors.shadow,
-                      shadowOpacity: expanded ? (theme.appearance === 'dark' ? 0.28 : 0.14) : theme.appearance === 'dark' ? 0.2 : 0.1,
-                      transform: [{ scale: pressed ? 0.992 : 1 }],
+                      borderColor: priority.borderColor,
+                      backgroundColor: priority.tint,
+                      shadowOpacity: priority.glow,
+                      shadowColor: theme.colors.accentBlue,
                     }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.sm, alignItems: 'center' }}>
-                      <View style={{ flex: 1, gap: 4 }}>
-                        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{card.title}</Text>
-                        <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{card.summary}</Text>
-                      </View>
-                      <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>{expanded ? 'Hide' : 'Expand'}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing.xs, alignItems: 'center' }}>
+                      <Text style={{ ...theme.typography.meta, color: theme.colors.accentViolet }}>{item.category}</Text>
+                      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{item.time}</Text>
                     </View>
 
-                    <View style={{ gap: theme.spacing.sm }}>
-                      {card.items.map((item) => (
-                        <TrendRow key={`${card.id}-${item.label}`} item={item} theme={theme} expanded={expanded} />
+                    <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{item.title}</Text>
+                    <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>{item.context}</Text>
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+                      {typeof item.matchScore === 'number' ? (
+                        <View style={{ borderRadius: theme.radius.pill, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: `${theme.colors.accentBlue}22` }}>
+                          <Text style={{ ...theme.typography.meta, color: theme.colors.accentBlue }}>Match {item.matchScore}%</Text>
+                        </View>
+                      ) : null}
+                      {item.urgency ? (
+                        <View style={{ borderRadius: theme.radius.pill, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: `${theme.colors.accentWarning}22` }}>
+                          <Text style={{ ...theme.typography.meta, color: theme.colors.accentWarning }}>Urgency {item.urgency}</Text>
+                        </View>
+                      ) : null}
+                      <View style={{ borderRadius: theme.radius.pill, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: `${theme.colors.accentViolet}1F` }}>
+                        <Text style={{ ...theme.typography.meta, color: theme.colors.accentViolet }}>
+                          {item.priority === 'high' ? 'High priority' : item.priority === 'medium' ? 'Medium priority' : 'Low priority'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, paddingTop: 2 }}>
+                      {item.actions.map((action) => (
+                        <Pressable
+                          key={`${item.id}-${action}`}
+                          onPress={() => {
+                            if (action === 'Mark important') {
+                              setImportantIds((current) =>
+                                current.includes(item.id) ? current.filter((entry) => entry !== item.id) : [...current, item.id]
+                              );
+                            }
+                          }}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 6,
+                            borderRadius: theme.radius.pill,
+                            borderWidth: 1,
+                            borderColor: action === 'Mark important' && isImportant ? theme.colors.accentBlue : theme.colors.border,
+                            backgroundColor: action === 'Mark important' && isImportant ? `${theme.colors.accentBlue}20` : 'transparent',
+                          }}>
+                          <Text style={{ ...theme.typography.meta, color: theme.colors.textSecondary }}>{action}</Text>
+                        </Pressable>
                       ))}
                     </View>
                   </Card>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionHeader theme={theme} title="AI Insight Reports" subtitle="Generated market interpretations from current internship activity" />
-
-        <View style={{ gap: theme.spacing.md }}>
-          {INSIGHTS.map((insight) => (
-            <Card
-              key={insight.id}
-              theme={theme}
-              style={{
-                borderRadius: theme.radius.lg,
-                gap: theme.spacing.xs,
-                borderColor: theme.colors.border,
-                backgroundColor:
-                  theme.appearance === 'dark' ? `${theme.colors.surfaceStrong}${DARK_INSIGHT_CARD_TINT}` : theme.colors.surface,
-              }}>
-              <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{insight.title}</Text>
-              <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>{insight.detail}</Text>
-              <Text style={{ ...theme.typography.meta, color: theme.colors.accentViolet }}>{insight.confidence}</Text>
-            </Card>
-          ))}
-        </View>
+                );
+              })}
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
