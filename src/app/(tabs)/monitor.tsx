@@ -68,8 +68,8 @@ export default function MonitorScreen() {
               width: 12,
               height: 12,
               borderRadius: theme.radius.pill,
-              backgroundColor: theme.colors.accentSuccess,
-              shadowColor: theme.colors.accentSuccess,
+              backgroundColor: theme.colors.accentRose,
+              shadowColor: theme.colors.accentRose,
               shadowOpacity: theme.appearance === 'dark' ? 0.6 : 0.2,
               shadowRadius: 8,
             }}

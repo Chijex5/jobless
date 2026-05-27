@@ -17,10 +17,36 @@ export const fetcher = async (url: string) => {
     return res.json();
 }
 
-export const useInteligence = () => {
-    const { data, isLoading, error } = useSWR<Signal>('/api/inteligence', () => fetcher("http:/192.168.227.58:8000/signals"));
-    return { data, isLoading, error };
-}
+export const useInteligence = (querys?: string[]) => {
+  const queryString = querys?.length
+    ? `?${querys.join('&')}`
+    : '';
+
+  const {
+    data,
+    isLoading,
+    error,
+    mutate,
+  } = useSWR<Signal>(
+    '/api/inteligence' + queryString,
+    () =>
+      fetcher(
+        `http://192.168.227.58:8000/signals${queryString}`
+      )
+  );
+
+  // Force refetch manually
+  const forcedRefetch = async () => {
+    return await mutate();
+  };
+
+  return {
+    data,
+    isLoading,
+    error,
+    forcedRefetch,
+  };
+};
 
 export const useInteligenceById  = (id:  string) => {
     const  { data, isLoading, error } = useSWR<IntelligenceSignal>(id ? `/api/inteligence/${id}` : null, () => fetcher(`http://192.168.227.58:8000/signals/${id}`));

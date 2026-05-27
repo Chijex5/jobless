@@ -4,7 +4,7 @@ import {
   useNavigation,
   useRouter,
 } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -18,7 +18,6 @@ import {
 
 import { api } from "@/lib/backend";
 
-
 import {
   useRelatedInteligenceById,
   useInteligenceById,
@@ -26,8 +25,9 @@ import {
 import { useAppTheme } from "@/theme/use-app-theme";
 import { IntelligenceSignal } from "@/data/mock";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+import type { AppTheme } from "@/theme/tokens";
 
+// ─── 
 const SECTION_STAGGER_MS = 90;
 const SECTION_REVEAL_DURATION_MS = 300;
 const SOURCE_EXPAND_DURATION_MS = 220;
@@ -44,7 +44,7 @@ function getStrengthLabel(score: number): string {
 }
 
 function scoreColor(score: number, theme: AppTheme): string {
-  if (score >= 90) return theme.colors.accentSuccess;
+  if (score >= 90) return theme.colors.accentRose;
   if (score >= 80) return theme.colors.accentBlue;
   if (score >= 70) return theme.colors.accentViolet;
   return theme.colors.textMuted;
@@ -57,9 +57,11 @@ function formatRelativeTime(hoursAgo: number): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+interface SaveSignalRequest {
+  status: string;
+}
 
-import type { AppTheme } from "@/theme/tokens";
+interface SaveSignalResponse extends IntelligenceSignal {}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -466,15 +468,17 @@ export default function OpportunityDetailScreen() {
   const handleBack = () => router.back();
 
   const {
-    data: signal,
+    data: localSignal,
     isLoading: isSignalLoading,
     error: signalError,
-  } = useInteligenceById(id || '');
+  } = useInteligenceById(id || "");
 
   const { data: relatedSignals, isLoading: isRelatedLoading } =
-    useRelatedInteligenceById(id||'');
+    useRelatedInteligenceById(id || "");
 
-  const isSaved = signal?.status === "saved";
+  const [signal, setSignal] = useState(localSignal);
+
+  const isSaved = signal?.isSaved ?? false;
   const [interestState, setInterestState] = useState<
     "none" | "interested" | "not-relevant"
   >("none");
@@ -484,21 +488,35 @@ export default function OpportunityDetailScreen() {
     Array.from({ length: SECTION_COUNT }, () => new Animated.Value(0)),
   ).current;
 
+  useEffect(() => {
+    if (localSignal) setSignal(localSignal);
+  }, [localSignal]);
+
+
   const sourceAnim = useRef(new Animated.Value(0)).current;
 
-  const SaveSignal = async (signalId: string, status: string = "saved") => {
+  const SaveSignal = async (
+    signalId: string,
+    status: string = "saved",
+  ): Promise<void> => {
     setSaveLoading(true);
-    try{
-    const res = await api.patch(`/signals/${signalId}`, { status });
-    if (res && signal) {
-      signal.status = status;
-    }
+    try {
+      const payload: SaveSignalRequest = { status };
+      const res = await api.patch<SaveSignalResponse>(
+        `/signals/${signalId}`,
+        payload,
+      );
+      if (res && signal) {
+        setSignal(prev =>
+          prev ? { ...prev, status: res.status, isSaved: res.isSaved } : prev
+        );
+      }
     } catch (error) {
       console.error("Error saving signal:", error);
     } finally {
       setSaveLoading(false);
     }
-  }
+  };
 
   // Push the role name into the header title via navigation params
   useEffect(() => {
@@ -613,51 +631,49 @@ export default function OpportunityDetailScreen() {
   }
 
   function timeAgo(postedAt: string): string {
-  const now = new Date();
-  const posted = new Date(postedAt);
+    const now = new Date();
+    const posted = new Date(postedAt);
 
-  const seconds = Math.floor(
-    (now.getTime() - posted.getTime()) / 1000
-  );
+    const seconds = Math.floor((now.getTime() - posted.getTime()) / 1000);
 
-  if (seconds < 60) {
-    return "Just now";
+    if (seconds < 60) {
+      return "Just now";
+    }
+
+    const minutes = Math.floor(seconds / 60);
+
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+
+    if (hours < 24) {
+      return `${hours}h ago`;
+    }
+
+    const days = Math.floor(hours / 24);
+
+    if (days < 7) {
+      return `${days}d ago`;
+    }
+
+    const weeks = Math.floor(days / 7);
+
+    if (weeks < 4) {
+      return `${weeks}w ago`;
+    }
+
+    const months = Math.floor(days / 30);
+
+    if (months < 12) {
+      return `${months}mo ago`;
+    }
+
+    const years = Math.floor(days / 365);
+
+    return `${years}y ago`;
   }
-
-  const minutes = Math.floor(seconds / 60);
-
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-
-  if (days < 7) {
-    return `${days}d ago`;
-  }
-
-  const weeks = Math.floor(days / 7);
-
-  if (weeks < 4) {
-    return `${weeks}w ago`;
-  }
-
-  const months = Math.floor(days / 30);
-
-  if (months < 12) {
-    return `${months}mo ago`;
-  }
-
-  const years = Math.floor(days / 365);
-
-  return `${years}y ago`;
-}
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -699,6 +715,7 @@ export default function OpportunityDetailScreen() {
               </Text>
               <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
                 {signal.location} · {timeAgo(signal.postedAt)}
+                {signal.pay != null ? ` · ${signal.pay}` : ''}
               </Text>
             </View>
 
@@ -707,9 +724,9 @@ export default function OpportunityDetailScreen() {
             {/* Match score block */}
             <View
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 backgroundColor: `${accent}0E`,
                 borderRadius: theme.radius.md,
                 borderWidth: StyleSheet.hairlineWidth,
@@ -722,9 +739,9 @@ export default function OpportunityDetailScreen() {
                 <Text
                   style={{
                     fontSize: 11,
-                    fontWeight: "600",
+                    fontWeight: '600',
                     color: accent,
-                    textTransform: "uppercase",
+                    textTransform: 'uppercase',
                     letterSpacing: 0.5,
                   }}
                 >
@@ -733,11 +750,23 @@ export default function OpportunityDetailScreen() {
                 <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
                   AI confidence score
                 </Text>
+                {signal.pay != null && (
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '600',
+                      color: theme.colors.textPrimary,
+                      marginTop: 4,
+                    }}
+                  >
+                    {signal.pay}
+                  </Text>
+                )}
               </View>
               <Text
                 style={{
                   fontSize: 36,
-                  fontWeight: "700",
+                  fontWeight: '700',
                   color: accent,
                   letterSpacing: -1,
                 }}
@@ -752,7 +781,7 @@ export default function OpportunityDetailScreen() {
                 label={signal.roleMode ?? "On-site"}
                 color={
                   signal.roleMode === "Remote"
-                    ? theme.colors.accentSuccess
+                    ? theme.colors.accentRose
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -761,7 +790,7 @@ export default function OpportunityDetailScreen() {
                 label={signal.applicationStatus}
                 color={
                   signal.applicationStatus === "Open"
-                    ? theme.colors.accentSuccess
+                    ? theme.colors.accentRose
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -884,7 +913,7 @@ export default function OpportunityDetailScreen() {
                 }
                 color={
                   signal.sourceConfidence === "High"
-                    ? theme.colors.accentSuccess
+                    ? theme.colors.accentRose
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -910,7 +939,7 @@ export default function OpportunityDetailScreen() {
             </Text>
 
             {/* Primary CTA */}
-            <Pressable onPress={() => Linking.openURL(signal.sourceUrl)}>
+            <Pressable onPress={() => Linking.openURL(signal?.applyLink || signal.sourceUrl)}>
               {({ pressed }) => (
                 <View
                   style={{
@@ -951,7 +980,7 @@ export default function OpportunityDetailScreen() {
             {/* Secondary actions */}
             <View style={{ flexDirection: "row", gap: 8 }}>
               <Pressable
-                onPress={() => SaveSignal(signal.id, signal.status === "saved" ? "new" : "saved")}
+                onPress={() => SaveSignal(signal.id, isSaved ? "new" : "saved")}
                 style={{ flex: 1 }}
               >
                 {({ pressed }) => (
@@ -965,7 +994,7 @@ export default function OpportunityDetailScreen() {
                         ? theme.colors.accentBlue
                         : theme.colors.border,
                       backgroundColor: isSaved
-                        ? `${signal.status === "saved" ? theme.colors.accentBlue : "transparent"}12`
+                        ? `${signal.isSaved ? theme.colors.accentBlue : "transparent"}12`
                         : pressed
                           ? theme.colors.surfaceStrong
                           : "transparent",
@@ -981,7 +1010,13 @@ export default function OpportunityDetailScreen() {
                           : theme.colors.textSecondary,
                       }}
                     >
-                      {saveLoading ? signal.status === "saved" ? "Removing..." : "Saving..." : signal.status === "saved" ? "✓ Saved" : "Save"}
+                      {saveLoading
+                        ? isSaved
+                          ? "Removing..."
+                          : "Saving..."
+                        : isSaved
+                          ? "✓ Saved"
+                          : "Save"}
                     </Text>
                   </View>
                 )}
@@ -1004,11 +1039,11 @@ export default function OpportunityDetailScreen() {
                       borderWidth: StyleSheet.hairlineWidth,
                       borderColor:
                         interestState === "interested"
-                          ? theme.colors.accentSuccess
+                          ? theme.colors.accentRose
                           : theme.colors.border,
                       backgroundColor:
                         interestState === "interested"
-                          ? `${theme.colors.accentSuccess}12`
+                          ? `${theme.colors.accentRose}12`
                           : pressed
                             ? theme.colors.surfaceStrong
                             : "transparent",
@@ -1021,7 +1056,7 @@ export default function OpportunityDetailScreen() {
                         fontWeight: "600",
                         color:
                           interestState === "interested"
-                            ? theme.colors.accentSuccess
+                            ? theme.colors.accentRose
                             : theme.colors.textSecondary,
                       }}
                     >
@@ -1155,7 +1190,7 @@ export default function OpportunityDetailScreen() {
 
               {(signal.sourceMetadata ?? []).length > 0 && (
                 <View style={{ gap: 4 }}>
-                  {signal.sourceMetadata.map((entry: string,  i) => (
+                  {signal.sourceMetadata.map((entry: string, i) => (
                     <Text
                       key={`meta-${entry}-${i}`}
                       style={{
@@ -1206,9 +1241,9 @@ export default function OpportunityDetailScreen() {
                 {(Array.isArray(relatedSignals)
                   ? relatedSignals
                   : relatedSignals
-                  ? [relatedSignals]
-                  : [])
-                  .map((related) => (
+                    ? [relatedSignals]
+                    : []
+                ).map((related) => (
                   <Pressable
                     key={related.id}
                     onPress={() =>

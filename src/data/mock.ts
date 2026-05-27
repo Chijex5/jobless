@@ -14,15 +14,13 @@ export type InternshipOpportunity = {
   notificationState: NotificationState;
 };
 
-export  type PipelineStage = {
-  "new" : string;
-  saved : string;
-  applied : string;
-  interviewing : string;
-  offered : string;
-  rejected : string;
-}
-
+export type PipelineStage =
+  | "new"
+  | "saved"
+  | "applied"
+  | "interviewing"
+  | "offered"
+  | "rejected";
 export type IntelligenceSignal = {
   id: string;
   role: string;
@@ -41,12 +39,17 @@ export type IntelligenceSignal = {
   extractionConfidence: 'High' | 'Medium' | 'Low';
   roleType: string;
   roleMode: 'Remote' | 'Hybrid' | 'On-site';
+  isSaved?: boolean;
+  isInterested?: boolean;
+  isSkipped?: boolean;
   applicationStatus: 'Open' | 'Closing soon' | 'Unknown';
   sourceConfidence: 'High' | 'Medium' | 'Low';
   originalSourceText: string;
   platform?: string | null;
   sourceMetadata: string[];
   relatedIds: string[];
+  applyLink?: string;
+  pay?: string;
 };
 
 export const internshipOpportunities: InternshipOpportunity[] = [

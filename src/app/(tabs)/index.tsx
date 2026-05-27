@@ -15,6 +15,7 @@ import { ArrowDownNarrowWide }  from  "lucide-react-native";
 import { AppTheme } from "@/theme/tokens";
 import { LivePulse } from "@/components/ui";
 import { useAppTheme } from "@/theme/use-app-theme";
+import { api } from "@/lib/backend";
 
 const CARD_STAGGER_DELAY_MS = 50;
 const CARD_ANIMATION_DURATION_MS = 280;
@@ -32,6 +33,11 @@ const SORT_OPTIONS = [
   { label: "Oldest first", value: "oldest" },
   { label: "By platform", value: "platform" },
 ];
+
+interface SaveSignalRequest {
+  status: string;
+}
+interface SaveSignalResponse extends IntelligenceSignal {}
 
 type Signal = IntelligenceSignal;
 type SortValue = "match" | "recent" | "oldest" | "platform";
@@ -71,7 +77,7 @@ function scoreLabel(score: number) {
 }
 
 function scoreColor(score: number, theme: any): string {
-  if (score >= 90) return theme.colors.accentSuccess;
+  if (score >= 90) return theme.colors.accentRose;
   if (score >= 80) return theme.colors.accentBlue;
   if (score >= 70) return theme.colors.accentViolet;
   return theme.colors.textMuted;
@@ -97,7 +103,7 @@ function roleTypeBadgeColor(roleType: string, theme: any) {
     "Software Engineering": theme.colors.accentBlue,
     Data: theme.colors.accentViolet,
     QA: theme.colors.accentWarning,
-    Design: theme.colors.accentSuccess,
+    Design: theme.colors.accentRose,
     Other: theme.colors.textMuted,
   };
   return map[roleType] ?? theme.colors.textMuted;
@@ -641,7 +647,7 @@ function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number;
           marginVertical: 4,
         }}
       />
-      <Stat label="≥85 fit" value={highMatch} color={theme.colors.accentSuccess} />
+      <Stat label="≥85 fit" value={highMatch} color={theme.colors.accentRose} />
       <View
         style={{
           width: StyleSheet.hairlineWidth,
@@ -661,12 +667,14 @@ function SignalCard({
   theme,
   saved,
   onSave,
+  loading,
   onView,
   animation,
 }: {
   item: Signal;
   theme: AppTheme;
   saved: boolean;
+  loading: boolean;
   onSave: () => void;
   onView: () => void;
   animation: Animated.Value;
@@ -776,7 +784,7 @@ function SignalCard({
                     paddingVertical: 3,
                     backgroundColor:
                       item.roleMode === "Remote"
-                        ? `${theme.colors.accentSuccess}18`
+                        ? `${theme.colors.accentRose}18`
                         : theme.colors.surfaceStrong,
                   }}
                 >
@@ -787,7 +795,7 @@ function SignalCard({
                       letterSpacing: 0.4,
                       color:
                         item.roleMode === "Remote"
-                          ? theme.colors.accentSuccess
+                          ? theme.colors.accentRose
                           : theme.colors.textMuted,
                     }}
                   >
@@ -868,19 +876,35 @@ function SignalCard({
           )}
 
           {/* Meta row */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text style={{ fontSize: 11, color: turnDatetoHours(item.postedAt) < 24 ? theme.colors.accentSuccess : turnDatetoHours(item.postedAt) < 168 ? theme.colors.textMuted : turnDatetoHours(item.postedAt) < 336 ? theme.colors.accentWarning : theme.colors.accentError }}>
-              {timeAgo(item.postedAt)}
-            </Text>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+                {timeAgo(item.postedAt)}
+              </Text>
+              {item.pay != null && (
+                <View
+                  style={{
+                    borderRadius: theme.radius.sm,
+                    paddingHorizontal: 7,
+                    paddingVertical: 3,
+                    backgroundColor: `${theme.colors.accentRose}10`,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: `${theme.colors.accentRose}25`,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '600',
+                      color: theme.colors.accentRose,
+                    }}
+                  >
+                    {item.pay}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {item.roleType && (
                 <View
                   style={{
@@ -892,22 +916,13 @@ function SignalCard({
                     borderColor: `${badgeColor}28`,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "600",
-                      color: badgeColor,
-                      letterSpacing: 0.3,
-                    }}
-                  >
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: badgeColor, letterSpacing: 0.3 }}>
                     {item.roleType}
                   </Text>
                 </View>
               )}
               <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>
-                {item.extractionConfidence === "High"
-                  ? "High confidence"
-                  : "Medium confidence"}
+                {item.extractionConfidence === 'High' ? 'High confidence' : 'Medium confidence'}
               </Text>
             </View>
           </View>
@@ -939,7 +954,13 @@ function SignalCard({
                       color: saved ? accent : theme.colors.textSecondary,
                     }}
                   >
-                    {saved ? "✓ Saved" : "Save"}
+                    {loading
+                        ? saved
+                          ? "Removing..."
+                          : "Saving..."
+                        : saved
+                          ? "✓ Saved"
+                          : "Save"}
                   </Text>
                 </View>
               )}
@@ -1087,12 +1108,17 @@ export default function IntelligenceScreen() {
   const [sortSheetVisible, setSortSheetVisible] = useState(false);
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const [scanningStateIndex, setScanningStateIndex] = useState(0);
-
+  const [signals, setSignals] = useState<Signal[] >([]);
+  const [saveLoading, setSaveLoading] = useState(false);
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
 
   const intelligenceResult = useInteligence();
   const { data: intelligenceSignals, isLoading, error } = intelligenceResult;
-  const signals: Signal[] = intelligenceSignals?.signals ?? [];
+  useEffect(() => {
+    if (intelligenceSignals?.signals) {
+      setSignals(intelligenceSignals.signals);
+    }
+  }, [intelligenceSignals]);
 
   useEffect(() => {
     const iv = setInterval(
@@ -1109,6 +1135,37 @@ export default function IntelligenceScreen() {
     },
     [cardAnimations]
   );
+
+  const SaveSignal = async (
+      signalId: string,
+      status: string = "saved",
+    ): Promise<void> => {
+      setSaveLoading(true);
+      try {
+        const payload: SaveSignalRequest = { status };
+        const res = await api.patch<SaveSignalResponse>(
+          `/signals/${signalId}`,
+          payload,
+        );
+        if (res && signals) {
+          setSignals(prev =>
+            prev?.map(signal =>
+              signal.id === signalId
+                ? {
+                    ...signal,
+                    status: res.status,
+                    isSaved: res.isSaved,
+                  }
+                : signal
+            )
+          );
+        }
+      } catch (error) {
+        console.error("Error saving signal:", error);
+      } finally {
+        setSaveLoading(false);
+      }
+    };
 
   const filteredAndSorted = useMemo(() => {
     const strategy = FILTER_STRATEGIES[activeFilter];
@@ -1171,14 +1228,6 @@ export default function IntelligenceScreen() {
       >
         {/* Stats bar — sits right below the tab header */}
         {signals.length > 0 && <StatsBar signals={signals} total={intelligenceSignals?.total  || 0} theme={theme} />}
-
-        {/* Scanning state */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <LivePulse theme={theme} />
-          <Text style={{ fontSize: 11, fontWeight: "500", color: theme.colors.textMuted }}>
-            {LOADING_STATES[scanningStateIndex]}
-          </Text>
-        </View>
 
         {/* Fix #3: filters and sort on separate lines, visually aligned */}
         {/* Filter row */}
@@ -1291,8 +1340,9 @@ export default function IntelligenceScreen() {
                 key={item.id}
                 item={item}
                 theme={theme}
-                saved={Boolean(savedIds[item.id])}
-                onSave={() => toggleSave(item.id)}
+                loading={saveLoading}
+                saved={item?.isSaved ?? false}
+                onSave={() => SaveSignal(item.id, item?.isSaved ? "new" : "saved")}
                 onView={() =>
                   router.push({
                     pathname: "/opportunity/[id]",
