@@ -58,7 +58,7 @@ export const SECTION_ORDER: NotificationSection[] = [
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.227.58:8000';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://ai-scraper-tb7n.onrender.com';
 const POLL_MS  = 5 * 60 * 1000; // re-fetch every 5 min
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────

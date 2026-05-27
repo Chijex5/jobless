@@ -31,7 +31,7 @@ export const useInteligence = (querys?: string[]) => {
     '/api/inteligence' + queryString,
     () =>
       fetcher(
-        `http://192.168.227.58:8000/signals${queryString}`
+        `https://ai-scraper-tb7n.onrender.com/signals${queryString}`
       )
   );
 
@@ -49,12 +49,12 @@ export const useInteligence = (querys?: string[]) => {
 };
 
 export const useInteligenceById  = (id:  string) => {
-    const  { data, isLoading, error } = useSWR<IntelligenceSignal>(id ? `/api/inteligence/${id}` : null, () => fetcher(`http://192.168.227.58:8000/signals/${id}`));
+    const  { data, isLoading, error } = useSWR<IntelligenceSignal>(id ? `/api/inteligence/${id}` : null, () => fetcher(`https://ai-scraper-tb7n.onrender.com/signals/${id}`));
     return { data, isLoading, error };
 }
 
 export const useRelatedInteligenceById  = (id:  string) => {
-    const  { data, isLoading, error } = useSWR<IntelligenceSignal>(id ? `/api/${id}/related` : null, () => fetcher(`http://192.168.227.58:8000/signals/${id}/related`));
+    const  { data, isLoading, error } = useSWR<IntelligenceSignal>(id ? `/api/${id}/related` : null, () => fetcher(`https://ai-scraper-tb7n.onrender.com/signals/${id}/related`));
     return { data, isLoading, error };
 }
 

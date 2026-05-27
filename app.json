@@ -8,7 +8,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {},
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.chijex5.jobless"
     },
     "web": {
       "output": "static"
@@ -25,6 +26,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1646ba58-4016-4def-bfec-c2763a0f4dea"
+      }
     }
   }
 }
