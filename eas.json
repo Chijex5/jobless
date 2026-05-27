@@ -6,16 +6,13 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "installCommand": "pnpm install"
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "installCommand": "pnpm install"
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "installCommand": "pnpm install"
+      "autoIncrement": true
     }
   },
   "submit": {
