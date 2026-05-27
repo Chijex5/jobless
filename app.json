@@ -6,32 +6,33 @@
     "orientation": "portrait",
     "scheme": "jobless",
     "userInterfaceStyle": "automatic",
+    "icon": "./src/assets/logo.png",
     "ios": {},
     "android": {
       "predictiveBackGestureEnabled": false,
-      "package": "com.chijex5.jobless"
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/logo.png",
+        "backgroundColor": "#f7f3ec"
+      }
     },
     "web": {
-      "output": "static"
+      "output": "static",
+      "favicon": "./src/assets/logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#f7f3ec"
+          "backgroundColor": "#f7f3ec",
+          "image": "./src/assets/logo.png",
+          "imageWidth": 220
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "1646ba58-4016-4def-bfec-c2763a0f4dea"
-      }
     }
   }
 }
