@@ -868,19 +868,35 @@ function SignalCard({
           )}
 
           {/* Meta row */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text style={{ fontSize: 11, color: turnDatetoHours(item.postedAt) < 24 ? theme.colors.accentSuccess : turnDatetoHours(item.postedAt) < 168 ? theme.colors.textMuted : turnDatetoHours(item.postedAt) < 336 ? theme.colors.accentWarning : theme.colors.accentError }}>
-              {timeAgo(item.postedAt)}
-            </Text>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+                {timeAgo(item.postedAt)}
+              </Text>
+              {item.pay != null && (
+                <View
+                  style={{
+                    borderRadius: theme.radius.sm,
+                    paddingHorizontal: 7,
+                    paddingVertical: 3,
+                    backgroundColor: `${theme.colors.accentSuccess}10`,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: `${theme.colors.accentSuccess}25`,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '600',
+                      color: theme.colors.accentSuccess,
+                    }}
+                  >
+                    {item.pay}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {item.roleType && (
                 <View
                   style={{
@@ -892,22 +908,13 @@ function SignalCard({
                     borderColor: `${badgeColor}28`,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "600",
-                      color: badgeColor,
-                      letterSpacing: 0.3,
-                    }}
-                  >
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: badgeColor, letterSpacing: 0.3 }}>
                     {item.roleType}
                   </Text>
                 </View>
               )}
               <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>
-                {item.extractionConfidence === "High"
-                  ? "High confidence"
-                  : "Medium confidence"}
+                {item.extractionConfidence === 'High' ? 'High confidence' : 'Medium confidence'}
               </Text>
             </View>
           </View>
@@ -1171,14 +1178,6 @@ export default function IntelligenceScreen() {
       >
         {/* Stats bar — sits right below the tab header */}
         {signals.length > 0 && <StatsBar signals={signals} total={intelligenceSignals?.total  || 0} theme={theme} />}
-
-        {/* Scanning state */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <LivePulse theme={theme} />
-          <Text style={{ fontSize: 11, fontWeight: "500", color: theme.colors.textMuted }}>
-            {LOADING_STATES[scanningStateIndex]}
-          </Text>
-        </View>
 
         {/* Fix #3: filters and sort on separate lines, visually aligned */}
         {/* Filter row */}
