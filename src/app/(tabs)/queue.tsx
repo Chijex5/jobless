@@ -14,6 +14,7 @@ import { useInteligence } from '@/hooks/useInteligence';
 import { IntelligenceSignal } from '@/data/mock';
 import type { AppTheme } from '@/theme/tokens';
 import { api } from '@/lib/backend';
+import { ArrowDownNarrowWide } from 'lucide-react-native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1054,7 +1055,7 @@ export default function QueueScreen() {
                     transform: [{ scale: pressed ? 0.96 : 1 }],
                   }}
                 >
-                  <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>↕</Text>
+                  <ArrowDownNarrowWide size={16} color={theme.colors.textMuted} />
                   <Text
                     style={{
                       fontSize: 12,
