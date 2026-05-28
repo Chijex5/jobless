@@ -912,6 +912,7 @@ export default function QueueScreen() {
         pipelineStage: stageMap[s.id] ?? 'new',
       }));
   }, [localSignals, stageMap, removedIds]);
+  console.log('All queue items:', allQueueItems);
 
   const counts = useMemo<Record<PipelineStage, number>>(
     () => ({

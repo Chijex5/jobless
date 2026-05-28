@@ -47,46 +47,45 @@ const typography = {
 };
 
 const darkPalette: ThemePalette = {
-  background: '#0F1115',
-  surface: '#17191E',
-  surfaceStrong: '#1D2128',
-  surfaceElevated: '#252A33',
-  textPrimary: '#F3F4F6',
-  textSecondary: '#B2B8C2',
-  textMuted: '#7A808A',
-  border: '#2A303A',
+  background:      '#080C14',  // deep navy-black — not pure black, has depth
+  surface:         '#0E1420',  // card surface — clearly distinct from bg
+  surfaceStrong:   '#141C2E',  // elevated input / tag backgrounds
+  surfaceElevated: '#1A2235',  // borders double as elevated surfaces
+
+  textPrimary:   '#E2E8F0',  // warm white — easier on eyes than #FFF
+  textSecondary: '#64748B',  // slate — readable muted text
+  textMuted:     '#4A5568',  // placeholder / timestamps
+
+  border: '#1A2235',  // tight, matches surfaceElevated
   shadow: '#000000',
-  accentBlue: '#6EA8FE',
-  accentViolet: '#A78BFA',
-  accentSuccess: '#4ADE80',
-  accentWarning: '#FBBF24',
-  accentError: '#EF4444',
-  accentRose: '#d15c5c',
+
+  accentBlue:    '#38BDF8',  // sky-400 — electric, modern, your primary CTA
+  accentViolet:  '#818CF8',  // indigo-400 — strong scores, saved state
+  accentSuccess: '#34D399',  // emerald-400 — remote badge, good scores
+  accentWarning: '#FBBF24',  // amber-400 — kept
+  accentError:   '#F87171',  // red-400 — kept
+  accentRose:    '#F472B6',  // pink-400 — excellent scores, replaces dull #d15c5c
 };
 
 const lightPalette: ThemePalette = {
-  background: '#F7F8FA',
-  surface: '#FFFFFF',
-  surfaceStrong: '#F1F3F5',
-  surfaceElevated: '#E8EBEF',
+  background:      '#F0F4FA',  // cool-tinted white — not flat grey
+  surface:         '#FFFFFF',
+  surfaceStrong:   '#EBF0F8',
+  surfaceElevated: '#DDE5F2',
 
-  textPrimary: '#121417',
-  textSecondary: '#4E5662',
-  textMuted: '#8A9099',
+  textPrimary:   '#0D1117',
+  textSecondary: '#3D4E6B',
+  textMuted:     '#7A8CA8',
 
-  border: '#E3E7EC',
+  border: '#D8E3F0',
   shadow: '#00000010',
 
-  accentBlue: '#4F7DF3',
-  accentViolet: '#8B7CF6',
-
-  accentSuccess: '#22C55E',
-  accentWarning: '#EAA21B',
-
-  accentError: '#DC2626',
-
-  // your favorite color
-  accentRose: '#d15c5c',
+  accentBlue:    '#0EA5E9',  // sky-500 — same family as dark mode, slightly deeper
+  accentViolet:  '#6366F1',  // indigo-500
+  accentSuccess: '#10B981',  // emerald-500
+  accentWarning: '#F59E0B',
+  accentError:   '#EF4444',
+  accentRose:    '#EC4899',  // pink-500
 };
 
 export type AppTheme = {
@@ -108,17 +107,17 @@ export const getTheme = (appearance: Appearance): AppTheme => ({
 export const buildNavigationTheme = (theme: AppTheme): NavigationTheme => ({
   dark: theme.appearance === 'dark',
   colors: {
-    primary: theme.colors.accentBlue,
-    background: theme.colors.background,
-    card: theme.colors.surface,
-    text: theme.colors.textPrimary,
-    border: theme.colors.border,
+    primary:      theme.colors.accentBlue,
+    background:   theme.colors.background,
+    card:         theme.colors.surface,
+    text:         theme.colors.textPrimary,
+    border:       theme.colors.border,
     notification: theme.colors.accentViolet,
   },
   fonts: {
     regular: { fontFamily: 'System', fontWeight: '400' },
-    medium: { fontFamily: 'System', fontWeight: '500' },
-    bold: { fontFamily: 'System', fontWeight: '600' },
-    heavy: { fontFamily: 'System', fontWeight: '700' },
+    medium:  { fontFamily: 'System', fontWeight: '500' },
+    bold:    { fontFamily: 'System', fontWeight: '600' },
+    heavy:   { fontFamily: 'System', fontWeight: '700' },
   },
 });

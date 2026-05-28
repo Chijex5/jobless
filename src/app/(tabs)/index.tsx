@@ -1,4 +1,4 @@
-import { IntelligenceSignal, intelligenceSignals } from "@/data/mock";
+import { IntelligenceSignal } from "@/data/mock";
 import { useInteligence } from "@/hooks/useInteligence";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -6,20 +6,21 @@ import {
   Animated,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { ArrowDownNarrowWide }  from  "lucide-react-native";
+import { ArrowDownNarrowWide } from "lucide-react-native";
 import { AppTheme } from "@/theme/tokens";
 import { LivePulse } from "@/components/ui";
 import { useAppTheme } from "@/theme/use-app-theme";
 import { api } from "@/lib/backend";
 
-const CARD_STAGGER_DELAY_MS = 50;
+const CARD_STAGGER_DELAY_MS    = 50;
 const CARD_ANIMATION_DURATION_MS = 280;
-const LOADING_STATE_INTERVAL_MS = 1800;
+const LOADING_STATE_INTERVAL_MS  = 1800;
 const LOADING_STATES = ["Scanning sources", "Ranking signals", "Calibrating fit"];
 
 const FILTERS = [
@@ -27,47 +28,44 @@ const FILTERS = [
   "Remote", "Nigeria", "Global", "React", "Python",
 ];
 
-const SORT_OPTIONS = [
-  { label: "Best match", value: "match" },
-  { label: "Most recent", value: "recent" },
-  { label: "Oldest first", value: "oldest" },
+const SORT_OPTIONS: { label: string; value: SortValue }[] = [
+  { label: "Best match",  value: "match"    },
+  { label: "Oldest first", value: "newest"  },
+  { label: "Most recent", value: "oldest"   },
   { label: "By platform", value: "platform" },
 ];
 
-interface SaveSignalRequest {
-  status: string;
+const FILTER_PARAMS: Record<string, string> = {
+  All:      "",
+  Frontend: "role=frontend",
+  Backend:  "role=backend",
+  AI:       "role=ai",
+  Data:     "role=data",
+  Remote:   "location=remote",
+  Nigeria:  "location=nigeria",
+  Global:   "location=global",
+  React:    "skill=react",
+  Python:   "skill=python",
+};
+
+const PLATFORM_LABELS: Record<string, string> = {
+  remotive:  "Remotive",
+  telegram:  "Telegram",
+  jobberman: "Jobberman",
+  myjobmag:  "MyJobMag",
+  himalayas: "Himalayas",
+};
+
+function platformLabel(p?: string | null) {
+  if (!p) return null;
+  return PLATFORM_LABELS[p.toLowerCase()] ?? p;
 }
+
+interface SaveSignalRequest  { status: string }
 interface SaveSignalResponse extends IntelligenceSignal {}
 
-type Signal = IntelligenceSignal;
-type SortValue = "match" | "recent" | "oldest" | "platform";
-
-const FILTER_STRATEGIES: Record<string, (s: Signal) => boolean> = {
-  All: () => true,
-  Frontend: (s) => s.role.toLowerCase().includes("frontend"),
-  Backend: (s) => s.role.toLowerCase().includes("backend"),
-  AI: (s) =>
-    s.role.toLowerCase().includes("ai") ||
-    s.skillTags.some((t) => t.toLowerCase().includes("llm")),
-  Data: (s) =>
-    s.role.toLowerCase().includes("data") || s.roleType === "Data",
-  Remote: (s) => s.location.toLowerCase().includes("remote"),
-  Nigeria: (s) => s.location.toLowerCase().includes("nigeria"),
-  Global: (s) => s.location.toLowerCase().includes("global"),
-  React: (s) => s.skillTags.some((t) => t.toLowerCase().includes("react")),
-  Python: (s) => s.skillTags.some((t) => t.toLowerCase().includes("python")),
-};
-
-const SORT_STRATEGIES: Record<SortValue, (a: Signal, b: Signal) => number> = {
-  match: (a, b) => b.aiMatchScore - a.aiMatchScore,
-  recent: (a, b) =>
-    new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
-  oldest: (a, b) =>
-    new Date(a.postedAt).getTime() - new Date(b.postedAt).getTime(),
-  platform: (a, b) => (a.platform ?? "").localeCompare(b.platform ?? ""),
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type Signal    = IntelligenceSignal;
+type SortValue = "match" | "newest" | "oldest" | "platform";
 
 function scoreLabel(score: number) {
   if (score >= 90) return "Excellent";
@@ -76,43 +74,43 @@ function scoreLabel(score: number) {
   return "Fair";
 }
 
-function scoreColor(score: number, theme: any): string {
+function scoreColor(score: number, theme: AppTheme): string {
   if (score >= 90) return theme.colors.accentRose;
   if (score >= 80) return theme.colors.accentBlue;
   if (score >= 70) return theme.colors.accentViolet;
   return theme.colors.textMuted;
 }
 
-function turnDatetoHours(dateStr: string | null): number {
-  if (!dateStr) return 0;
-  const diff = Date.now() - new Date(dateStr).getTime();
-  return Math.floor(diff / 3_600_000);
-}
-
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return "Recently";
   const diff = Date.now() - new Date(dateStr).getTime();
   const h = Math.floor(diff / 3_600_000);
-  if (h < 1) return "Just now";
+  if (h < 1)  return "Just now";
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function roleTypeBadgeColor(roleType: string, theme: any) {
+function roleTypeBadgeColor(roleType: string, theme: AppTheme): string {
   const map: Record<string, string> = {
     "Software Engineering": theme.colors.accentBlue,
-    Data: theme.colors.accentViolet,
-    QA: theme.colors.accentWarning,
-    Design: theme.colors.accentRose,
-    Other: theme.colors.textMuted,
+    Data:                   theme.colors.accentViolet,
+    QA:                     theme.colors.accentWarning,
+    Design:                 theme.colors.accentRose,
+    Other:                  theme.colors.textMuted,
   };
   return map[roleType] ?? theme.colors.textMuted;
 }
 
-// ─── Score Badge ──────────────────────────────────────────────────────────────
-// Fix #2: wide enough to never clip label text
+// ─── hex opacity helper ───────────────────────────────────────────────────────
+// Appends a 2-char hex alpha to any 6-char hex colour.
+// Usage: alpha(theme.colors.accentBlue, "14")
+function alpha(hex: string, opacity: string): string {
+  return `${hex}${opacity}`;
+}
 
-function ScoreBadge({ score, theme }: { score: number; theme: any }) {
+// ─── ScoreBadge ───────────────────────────────────────────────────────────────
+
+function ScoreBadge({ score, theme }: { score: number; theme: AppTheme }) {
   const color = scoreColor(score, theme);
   const label = scoreLabel(score);
   return (
@@ -120,24 +118,16 @@ function ScoreBadge({ score, theme }: { score: number; theme: any }) {
       style={{
         alignItems: "center",
         justifyContent: "center",
-        minWidth: 64,
+        minWidth: 58,
         paddingHorizontal: 10,
-        paddingVertical: 8,
+        paddingVertical: 7,
         borderRadius: theme.radius.md,
-        backgroundColor: `${color}14`,
+        backgroundColor: alpha(color, "14"),
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: `${color}35`,
+        borderColor: alpha(color, "35"),
       }}
     >
-      <Text
-        style={{
-          fontSize: 20,
-          fontWeight: "700",
-          color,
-          letterSpacing: -0.5,
-          lineHeight: 24,
-        }}
-      >
+      <Text style={{ fontSize: 22, fontWeight: "700", color, letterSpacing: -0.5, lineHeight: 26 }}>
         {score}
       </Text>
       <Text
@@ -156,9 +146,9 @@ function ScoreBadge({ score, theme }: { score: number; theme: any }) {
   );
 }
 
-// ─── Skill Tag ────────────────────────────────────────────────────────────────
+// ─── SkillTag ─────────────────────────────────────────────────────────────────
 
-function SkillTag({ tag, theme }: { tag: string; theme: any }) {
+function SkillTag({ tag, theme }: { tag: string; theme: AppTheme }) {
   return (
     <View
       style={{
@@ -170,20 +160,92 @@ function SkillTag({ tag, theme }: { tag: string; theme: any }) {
         paddingVertical: 4,
       }}
     >
-      <Text
-        style={{
-          fontSize: 11,
-          fontWeight: "500",
-          color: theme.colors.textSecondary,
-        }}
-      >
+      <Text style={{ fontSize: 11, fontWeight: "500", color: theme.colors.textSecondary }}>
         {tag}
       </Text>
     </View>
   );
 }
 
-// ─── Sort Sheet ───────────────────────────────────────────────────────────────
+// ─── WorkModeBadge ────────────────────────────────────────────────────────────
+
+function WorkModeBadge({ roleMode, theme }: { roleMode?: string | null; theme: AppTheme }) {
+  const isRemote = roleMode === "Remote";
+  const isHybrid = roleMode === "Hybrid";
+
+  const color = isRemote
+    ? theme.colors.accentSuccess
+    : isHybrid
+    ? theme.colors.accentViolet
+    : theme.colors.textMuted;
+
+  const bg = isRemote
+    ? alpha(theme.colors.accentSuccess, "15")
+    : isHybrid
+    ? alpha(theme.colors.accentViolet, "15")
+    : theme.colors.surfaceStrong;
+
+  const border = isRemote
+    ? alpha(theme.colors.accentSuccess, "30")
+    : isHybrid
+    ? alpha(theme.colors.accentViolet, "30")
+    : theme.colors.border;
+
+  const dot = isRemote ? "●" : isHybrid ? "◑" : "○";
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        borderRadius: theme.radius.sm,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        backgroundColor: bg,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: border,
+      }}
+    >
+      <Text style={{ fontSize: 8, color, lineHeight: 12 }}>{dot}</Text>
+      <Text style={{ fontSize: 11, fontWeight: "600", color, letterSpacing: 0.2 }}>
+        {roleMode ?? "On-site"}
+      </Text>
+    </View>
+  );
+}
+
+// ─── PlatformBadge ────────────────────────────────────────────────────────────
+
+function PlatformBadge({ platform, theme }: { platform?: string | null; theme: AppTheme }) {
+  const label = platformLabel(platform);
+  if (!label) return null;
+
+  // All platforms use accentBlue — no special-casing external brand colours
+  const color = theme.colors.accentBlue;
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        borderRadius: theme.radius.sm,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        backgroundColor: alpha(color, "10"),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: alpha(color, "28"),
+      }}
+    >
+      <Text style={{ fontSize: 10, fontWeight: "600", color, letterSpacing: 0.2 }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// ─── SortSheet ────────────────────────────────────────────────────────────────
 
 function SortSheet({
   visible,
@@ -196,21 +258,12 @@ function SortSheet({
   activeSort: SortValue;
   onSelect: (v: SortValue) => void;
   onClose: () => void;
-  theme: any;
+  theme: AppTheme;
 }) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.5)",
-          justifyContent: "flex-end",
-        }}
+        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}
         onPress={onClose}
       >
         <Pressable>
@@ -256,10 +309,7 @@ function SortSheet({
               return (
                 <Pressable
                   key={opt.value}
-                  onPress={() => {
-                    onSelect(opt.value as SortValue);
-                    onClose();
-                  }}
+                  onPress={() => { onSelect(opt.value); onClose(); }}
                 >
                   {({ pressed }) => (
                     <View
@@ -269,9 +319,7 @@ function SortSheet({
                         justifyContent: "space-between",
                         paddingHorizontal: 20,
                         paddingVertical: 15,
-                        backgroundColor: pressed
-                          ? theme.colors.surfaceStrong
-                          : "transparent",
+                        backgroundColor: pressed ? theme.colors.surfaceStrong : "transparent",
                         borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
                         borderTopColor: theme.colors.border,
                       }}
@@ -280,9 +328,7 @@ function SortSheet({
                         style={{
                           fontSize: 15,
                           fontWeight: selected ? "600" : "400",
-                          color: selected
-                            ? theme.colors.textPrimary
-                            : theme.colors.textSecondary,
+                          color: selected ? theme.colors.textPrimary : theme.colors.textSecondary,
                         }}
                       >
                         {opt.label}
@@ -298,7 +344,7 @@ function SortSheet({
                             justifyContent: "center",
                           }}
                         >
-                          <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>
+                          <Text style={{ fontSize: 11, color: theme.colors.background, fontWeight: "700" }}>
                             ✓
                           </Text>
                         </View>
@@ -315,40 +361,23 @@ function SortSheet({
   );
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── SkeletonCard ─────────────────────────────────────────────────────────────
 
-function SkeletonCard({ theme, delay }: { theme: any; delay: number }) {
+function SkeletonCard({ theme, delay }: { theme: AppTheme; delay: number }) {
   const shimmer = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 0.7,
-          duration: 900,
-          delay,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmer, {
-          toValue: 0.3,
-          duration: 900,
-          useNativeDriver: true,
-        }),
+        Animated.timing(shimmer, { toValue: 0.7, duration: 900, delay, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0.3, duration: 900, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
 
-  const Block = ({
-    w,
-    h = 10,
-    radius = 4,
-  }: {
-    w: number | string;
-    h?: number;
-    radius?: number;
-  }) => (
+  const Block = ({ w, h = 10, radius = 4 }: { w: number | string; h?: number; radius?: number }) => (
     <Animated.View
       style={{
         width: w as any,
@@ -371,13 +400,7 @@ function SkeletonCard({ theme, delay }: { theme: any; delay: number }) {
         gap: 14,
       }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-        }}
-      >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ gap: 8, flex: 1 }}>
           <Block w="40%" h={10} />
           <Block w="70%" h={18} />
@@ -388,7 +411,7 @@ function SkeletonCard({ theme, delay }: { theme: any; delay: number }) {
       <Block w="100%" h={1} radius={1} />
       <View style={{ gap: 7 }}>
         <Block w="100%" h={10} />
-        <Block w="80%" h={10} />
+        <Block w="80%"  h={10} />
       </View>
       <View style={{ flexDirection: "row", gap: 6 }}>
         <Block w={52} h={24} radius={theme.radius.sm} />
@@ -403,9 +426,9 @@ function SkeletonCard({ theme, delay }: { theme: any; delay: number }) {
   );
 }
 
-// ─── Loading Screen ───────────────────────────────────────────────────────────
+// ─── LoadingScreen ────────────────────────────────────────────────────────────
 
-function LoadingScreen({ theme }: { theme: any }) {
+function LoadingScreen({ theme }: { theme: AppTheme }) {
   const [stateIndex, setStateIndex] = useState(0);
 
   useEffect(() => {
@@ -419,30 +442,13 @@ function LoadingScreen({ theme }: { theme: any }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ScrollView
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: 40,
-          gap: 12,
-        }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={false}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            paddingVertical: 4,
-          }}
-        >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 }}>
           <LivePulse theme={theme} />
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "500",
-              color: theme.colors.textMuted,
-            }}
-          >
+          <Text style={{ fontSize: 12, fontWeight: "500", color: theme.colors.textMuted }}>
             {LOADING_STATES[stateIndex]}
           </Text>
         </View>
@@ -454,15 +460,9 @@ function LoadingScreen({ theme }: { theme: any }) {
   );
 }
 
-// ─── Error Screen ─────────────────────────────────────────────────────────────
+// ─── ErrorScreen ──────────────────────────────────────────────────────────────
 
-function ErrorScreen({
-  theme,
-  onRetry,
-}: {
-  theme: any;
-  onRetry: () => void;
-}) {
+function ErrorScreen({ theme, onRetry }: { theme: AppTheme; onRetry: () => void }) {
   return (
     <View
       style={{
@@ -481,27 +481,15 @@ function ErrorScreen({
           overflow: "hidden",
         }}
       >
-        <View style={{ height: 3, backgroundColor: "#E5484D" }} />
+        {/* Error accent stripe — uses theme token */}
+        <View style={{ height: 3, backgroundColor: theme.colors.accentError }} />
         <View style={{ padding: 16, gap: 16 }}>
           <View style={{ gap: 4 }}>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "600",
-                color: theme.colors.textPrimary,
-              }}
-            >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: theme.colors.textPrimary }}>
               Feed unavailable
             </Text>
-            <Text
-              style={{
-                fontSize: 13,
-                color: theme.colors.textSecondary,
-                lineHeight: 19,
-              }}
-            >
-              The intelligence feed failed to respond. Saved opportunities are
-              unaffected.
+            <Text style={{ fontSize: 13, color: theme.colors.textSecondary, lineHeight: 19 }}>
+              The intelligence feed failed to respond. Saved opportunities are unaffected.
             </Text>
           </View>
           <Pressable onPress={onRetry}>
@@ -513,19 +501,11 @@ function ErrorScreen({
                   borderColor: theme.colors.border,
                   paddingVertical: 13,
                   alignItems: "center",
-                  backgroundColor: pressed
-                    ? theme.colors.surfaceStrong
-                    : "transparent",
+                  backgroundColor: pressed ? theme.colors.surfaceStrong : "transparent",
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "600",
-                    color: theme.colors.textPrimary,
-                  }}
-                >
+                <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.textPrimary }}>
                   Retry
                 </Text>
               </View>
@@ -537,9 +517,9 @@ function ErrorScreen({
   );
 }
 
-// ─── Empty Screen ─────────────────────────────────────────────────────────────
+// ─── EmptyScreen ──────────────────────────────────────────────────────────────
 
-function EmptyScreen({ theme, filter }: { theme: any; filter: string }) {
+function EmptyScreen({ theme, filter }: { theme: AppTheme; filter: string }) {
   return (
     <View
       style={{
@@ -552,59 +532,26 @@ function EmptyScreen({ theme, filter }: { theme: any; filter: string }) {
         gap: 6,
       }}
     >
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color: theme.colors.textMuted,
-        }}
-      >
+      <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textMuted }}>
         No {filter} signals
       </Text>
-      <Text
-        style={{
-          fontSize: 12,
-          color: theme.colors.textMuted,
-          textAlign: "center",
-          lineHeight: 18,
-        }}
-      >
+      <Text style={{ fontSize: 12, color: theme.colors.textMuted, textAlign: "center", lineHeight: 18 }}>
         Try a different filter or check back soon.
       </Text>
     </View>
   );
 }
 
-// ─── Stats Bar ────────────────────────────────────────────────────────────────
-// Fix #4: proper card container with background + border
+// ─── StatsBar ─────────────────────────────────────────────────────────────────
 
-function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number; theme: any }) {
-  const remote = signals.filter((s) =>
-    s.location?.toLowerCase().includes("remote")
-  ).length;
+function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number; theme: AppTheme }) {
+  const remote    = signals.filter((s) => s.location?.toLowerCase().includes("remote")).length;
   const highMatch = signals.filter((s) => s.aiMatchScore >= 85).length;
-  const open = signals.filter((s) => s.applicationStatus === "Open").length;
+  const open      = signals.filter((s) => s.applicationStatus === "Open").length;
 
-  const Stat = ({
-    label,
-    value,
-    color,
-  }: {
-    label: string;
-    value: number;
-    color: string;
-  }) => (
+  const Stat = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <View style={{ flex: 1, alignItems: "center", gap: 3 }}>
-      <Text
-        style={{
-          fontSize: 22,
-          fontWeight: "700",
-          color,
-          letterSpacing: -0.8,
-        }}
-      >
-        {value}
-      </Text>
+      <Text style={{ fontSize: 22, fontWeight: "700", color, letterSpacing: -0.8 }}>{value}</Text>
       <Text
         style={{
           fontSize: 10,
@@ -619,6 +566,16 @@ function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number;
     </View>
   );
 
+  const Divider = () => (
+    <View
+      style={{
+        width: StyleSheet.hairlineWidth,
+        backgroundColor: theme.colors.border,
+        marginVertical: 4,
+      }}
+    />
+  );
+
   return (
     <View
       style={{
@@ -631,36 +588,97 @@ function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number;
         paddingHorizontal: 8,
       }}
     >
-      <Stat label="Total" value={total} color={theme.colors.textPrimary} />
-      <View
-        style={{
-          width: StyleSheet.hairlineWidth,
-          backgroundColor: theme.colors.border,
-          marginVertical: 4,
-        }}
-      />
-      <Stat label="Remote" value={remote} color={theme.colors.accentBlue} />
-      <View
-        style={{
-          width: StyleSheet.hairlineWidth,
-          backgroundColor: theme.colors.border,
-          marginVertical: 4,
-        }}
-      />
-      <Stat label="≥85 fit" value={highMatch} color={theme.colors.accentRose} />
-      <View
-        style={{
-          width: StyleSheet.hairlineWidth,
-          backgroundColor: theme.colors.border,
-          marginVertical: 4,
-        }}
-      />
-      <Stat label="Open" value={open} color={theme.colors.accentViolet} />
+      <Stat label="Total"   value={total}     color={theme.colors.textPrimary}   />
+      <Divider />
+      <Stat label="Remote"  value={remote}    color={theme.colors.accentBlue}    />
+      <Divider />
+      <Stat label="≥85 fit" value={highMatch} color={theme.colors.accentRose}    />
+      <Divider />
+      <Stat label="Open"    value={open}      color={theme.colors.accentViolet}  />
     </View>
   );
 }
 
-// ─── Signal Card ──────────────────────────────────────────────────────────────
+// ─── PaginationBar ────────────────────────────────────────────────────────────
+
+function PaginationBar({
+  page,
+  pages,
+  onPrev,
+  onNext,
+  theme,
+}: {
+  page: number;
+  pages: number;
+  onPrev: () => void;
+  onNext: () => void;
+  theme: AppTheme;
+}) {
+  if (pages <= 1) return null;
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radius.md,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.border,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+      }}
+    >
+      <Pressable onPress={onPrev} disabled={page <= 1}>
+        {({ pressed }) => (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              opacity: page <= 1 ? 0.3 : pressed ? 0.7 : 1,
+              transform: [{ scale: pressed && page > 1 ? 0.97 : 1 }],
+            }}
+          >
+            <Text style={{ fontSize: 14, color: theme.colors.textPrimary }}>←</Text>
+            <Text style={{ fontSize: 13, fontWeight: "500", color: theme.colors.textPrimary }}>
+              Prev
+            </Text>
+          </View>
+        )}
+      </Pressable>
+
+      <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
+        Page{" "}
+        <Text style={{ fontWeight: "700", color: theme.colors.textPrimary }}>{page}</Text>
+        {" "}of{" "}
+        <Text style={{ fontWeight: "700", color: theme.colors.textPrimary }}>{pages}</Text>
+      </Text>
+
+      <Pressable onPress={onNext} disabled={page >= pages}>
+        {({ pressed }) => (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              opacity: page >= pages ? 0.3 : pressed ? 0.7 : 1,
+              transform: [{ scale: pressed && page < pages ? 0.97 : 1 }],
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "500", color: theme.colors.textPrimary }}>
+              Next
+            </Text>
+            <Text style={{ fontSize: 14, color: theme.colors.textPrimary }}>→</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── SignalCard ───────────────────────────────────────────────────────────────
 
 function SignalCard({
   item,
@@ -680,14 +698,15 @@ function SignalCard({
   animation: Animated.Value;
 }) {
   const [sourceExpanded, setSourceExpanded] = useState(false);
-  const accent = scoreColor(item.aiMatchScore, theme);
+  const accent     = scoreColor(item.aiMatchScore, theme);
   const badgeColor = roleTypeBadgeColor(item.roleType ?? "Other", theme);
+  const isRemote   = item.roleMode === "Remote";
 
   const skills = (item.skillAlignment ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, 3);
 
   return (
     <Animated.View
@@ -696,7 +715,7 @@ function SignalCard({
         transform: [
           {
             translateY: animation.interpolate({
-              inputRange: [0, 1],
+              inputRange:  [0, 1],
               outputRange: [16, 0],
             }),
           },
@@ -707,159 +726,88 @@ function SignalCard({
         style={{
           backgroundColor: theme.colors.surface,
           borderRadius: theme.radius.lg,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: theme.colors.border,
+          borderLeftWidth: 3,
+          borderLeftColor: isRemote ? theme.colors.accentSuccess : theme.colors.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderRightWidth: StyleSheet.hairlineWidth,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderTopColor: theme.colors.border,
+          borderRightColor: theme.colors.border,
+          borderBottomColor: theme.colors.border,
           overflow: "hidden",
         }}
       >
-        {/* Fix #7: thicker, more visible score stripe */}
-        <View
-          style={{
-            height: 3,
-            backgroundColor: theme.colors.surfaceElevated,
-          }}
-        >
+        {/* Score stripe */}
+        <View style={{ height: 2, backgroundColor: theme.colors.surfaceElevated }}>
           <View
             style={{
               height: "100%",
               width: `${item.aiMatchScore}%`,
               backgroundColor: accent,
-              opacity: 0.85,
+              opacity: 0.9,
             }}
           />
         </View>
 
-        <View style={{ padding: 16, gap: 14 }}>
+        <View style={{ padding: 16, gap: 12 }}>
 
-          {/* Fix #6: clear hierarchy — company muted small, role bold large */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 12,
-            }}
-          >
-            <View style={{ flex: 1, gap: 3 }}>
-              {/* Company — small muted */}
+          {/* ── Row 1: Company + Score ── */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <View style={{ flex: 1, gap: 4 }}>
               <Text
                 style={{
                   fontSize: 11,
-                  fontWeight: "500",
+                  fontWeight: "600",
                   color: theme.colors.textMuted,
-                  letterSpacing: 0.3,
+                  letterSpacing: 0.5,
                   textTransform: "uppercase",
                 }}
               >
                 {item.company ?? "Unknown"}
               </Text>
 
-              {/* Role — large bold, clear dominance */}
               <Text
                 style={{
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: "700",
                   color: theme.colors.textPrimary,
-                  letterSpacing: -0.4,
-                  lineHeight: 24,
+                  letterSpacing: -0.3,
+                  lineHeight: 23,
                 }}
                 numberOfLines={2}
               >
                 {item.role}
               </Text>
 
-              {/* Location / mode row */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 4,
-                }}
-              >
-                <View
-                  style={{
-                    borderRadius: 999,
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                    backgroundColor:
-                      item.roleMode === "Remote"
-                        ? `${theme.colors.accentRose}18`
-                        : theme.colors.surfaceStrong,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "600",
-                      letterSpacing: 0.4,
-                      color:
-                        item.roleMode === "Remote"
-                          ? theme.colors.accentRose
-                          : theme.colors.textMuted,
-                    }}
-                  >
-                    {item.roleMode ?? "On-site"}
-                  </Text>
-                </View>
-                {item.location !== "Unknown" &&
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                <WorkModeBadge roleMode={item.roleMode} theme={theme} />
+
+                {item.location &&
+                  item.location !== "Unknown" &&
                   item.location !== "Remote" && (
-                    <Text
-                      style={{ fontSize: 11, color: theme.colors.textMuted }}
-                    >
-                      {item.location}
+                    <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+                      · {item.location}
                     </Text>
                   )}
+
+                <PlatformBadge platform={item.platform} theme={theme} />
               </View>
             </View>
 
-            {/* Fix #2: ScoreBadge with fixed min-width */}
             <ScoreBadge score={item.aiMatchScore} theme={theme} />
           </View>
 
-          {/* Divider */}
-          <View
-            style={{
-              height: StyleSheet.hairlineWidth,
-              backgroundColor: theme.colors.border,
-            }}
-          />
+          {/* ── Divider ── */}
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
 
-          {/* AI summary */}
+          {/* ── AI summary ── */}
           {item.aiSummary != null && (
-            <Text
-              style={{
-                fontSize: 13,
-                lineHeight: 20,
-                color: theme.colors.textSecondary,
-              }}
-            >
+            <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>
               {item.aiSummary}
             </Text>
           )}
 
-          {/* Relevance reason */}
-          {item.relevanceReason && item.relevanceReason !== item.aiSummary && (
-            <View
-              style={{
-                borderLeftWidth: 2,
-                borderLeftColor: theme.colors.border,
-                paddingLeft: 10,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  lineHeight: 18,
-                  color: theme.colors.textMuted,
-                }}
-              >
-                {item.relevanceReason}
-              </Text>
-            </View>
-          )}
-
-          {/* Skill tags */}
+          {/* ── Skills ── */}
           {skills.length > 0 && (
             <ScrollView
               horizontal
@@ -875,9 +823,17 @@ function SignalCard({
             </ScrollView>
           )}
 
-          {/* Meta row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {/* ── Meta strip ── */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 4,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
                 {timeAgo(item.postedAt)}
               </Text>
@@ -887,47 +843,37 @@ function SignalCard({
                     borderRadius: theme.radius.sm,
                     paddingHorizontal: 7,
                     paddingVertical: 3,
-                    backgroundColor: `${theme.colors.accentRose}10`,
+                    backgroundColor: alpha(theme.colors.accentBlue, "10"),
                     borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: `${theme.colors.accentRose}25`,
+                    borderColor: alpha(theme.colors.accentBlue, "25"),
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: '600',
-                      color: theme.colors.accentRose,
-                    }}
-                  >
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.accentBlue }}>
                     {item.pay}
                   </Text>
                 </View>
               )}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {item.roleType && (
-                <View
-                  style={{
-                    borderRadius: theme.radius.sm,
-                    paddingHorizontal: 7,
-                    paddingVertical: 3,
-                    backgroundColor: `${badgeColor}12`,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: `${badgeColor}28`,
-                  }}
-                >
-                  <Text style={{ fontSize: 10, fontWeight: '600', color: badgeColor, letterSpacing: 0.3 }}>
-                    {item.roleType}
-                  </Text>
-                </View>
-              )}
-              <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>
-                {item.extractionConfidence === 'High' ? 'High confidence' : 'Medium confidence'}
-              </Text>
-            </View>
+
+            {item.roleType && (
+              <View
+                style={{
+                  borderRadius: theme.radius.sm,
+                  paddingHorizontal: 7,
+                  paddingVertical: 3,
+                  backgroundColor: alpha(badgeColor, "12"),
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: alpha(badgeColor, "28"),
+                }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: "600", color: badgeColor, letterSpacing: 0.3 }}>
+                  {item.roleType}
+                </Text>
+              </View>
+            )}
           </View>
 
-          {/* Fix #5: CTA — Save outline, Apply solid dark with contrast */}
+          {/* ── CTAs ── */}
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Pressable onPress={onSave} style={{ flex: 1 }}>
               {({ pressed }) => (
@@ -940,27 +886,17 @@ function SignalCard({
                     borderWidth: StyleSheet.hairlineWidth,
                     borderColor: saved ? accent : theme.colors.border,
                     backgroundColor: saved
-                      ? `${accent}12`
+                      ? alpha(accent, "12")
                       : pressed
                       ? theme.colors.surfaceStrong
                       : "transparent",
                     transform: [{ scale: pressed ? 0.97 : 1 }],
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "600",
-                      color: saved ? accent : theme.colors.textSecondary,
-                    }}
-                  >
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: saved ? accent : theme.colors.textSecondary }}>
                     {loading
-                        ? saved
-                          ? "Removing..."
-                          : "Saving..."
-                        : saved
-                          ? "✓ Saved"
-                          : "Save"}
+                      ? saved ? "Removing..." : "Saving..."
+                      : saved ? "✓ Saved" : "Save"}
                   </Text>
                 </View>
               )}
@@ -976,37 +912,23 @@ function SignalCard({
                     gap: 6,
                     borderRadius: theme.radius.md,
                     paddingVertical: 12,
-                    // Fix #5: solid high-contrast button, not washed-out white
                     backgroundColor: pressed
-                      ? theme.colors.textSecondary
-                      : theme.colors.textPrimary,
+                      ? theme.colors.accentBlue
+                      : theme.colors.accentBlue,
+                    opacity: pressed ? 0.85 : 1,
                     transform: [{ scale: pressed ? 0.97 : 1 }],
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "600",
-                      color: theme.colors.background,
-                    }}
-                  >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.background }}>
                     View Opportunity
                   </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.colors.background,
-                      opacity: 0.55,
-                    }}
-                  >
-                    ↗
-                  </Text>
+                  <Text style={{ fontSize: 12, color: theme.colors.background, opacity: 0.6 }}>↗</Text>
                 </View>
               )}
             </Pressable>
           </View>
 
-          {/* Source toggle */}
+          {/* ── Source toggle ── */}
           <Pressable onPress={() => setSourceExpanded((p) => !p)}>
             {({ pressed }) => (
               <View
@@ -1017,13 +939,7 @@ function SignalCard({
                   opacity: pressed ? 0.5 : 1,
                 }}
               >
-                <View
-                  style={{
-                    flex: 1,
-                    height: StyleSheet.hairlineWidth,
-                    backgroundColor: theme.colors.border,
-                  }}
-                />
+                <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
                 <Text
                   style={{
                     fontSize: 10,
@@ -1034,13 +950,7 @@ function SignalCard({
                 >
                   Source {sourceExpanded ? "▲" : "▼"}
                 </Text>
-                <View
-                  style={{
-                    flex: 1,
-                    height: StyleSheet.hairlineWidth,
-                    backgroundColor: theme.colors.border,
-                  }}
-                />
+                <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
               </View>
             )}
           </Pressable>
@@ -1056,12 +966,7 @@ function SignalCard({
                 gap: 8,
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text
                   style={{
                     fontSize: 10,
@@ -1073,9 +978,7 @@ function SignalCard({
                 >
                   {item.platform} · @{item.sourceHandle}
                 </Text>
-                <Text
-                  style={{ fontSize: 10, color: theme.colors.textMuted }}
-                >
+                <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>
                   {item.applicationStatus}
                 </Text>
               </View>
@@ -1097,36 +1000,38 @@ function SignalCard({
   );
 }
 
-// ─── Intelligence Screen ──────────────────────────────────────────────────────
+// ─── IntelligenceScreen ───────────────────────────────────────────────────────
 
 export default function IntelligenceScreen() {
-  const theme = useAppTheme();
+  const theme  = useAppTheme();
   const router = useRouter();
 
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [activeSort, setActiveSort] = useState<SortValue>("match");
+  const [activeFilter, setActiveFilter]         = useState("All");
+  const [activeSort, setActiveSort]             = useState<SortValue>("match");
+  const [page, setPage]                         = useState(1);
   const [sortSheetVisible, setSortSheetVisible] = useState(false);
-  const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
-  const [scanningStateIndex, setScanningStateIndex] = useState(0);
-  const [signals, setSignals] = useState<Signal[] >([]);
-  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveLoading, setSaveLoading]           = useState(false);
+  const [isRefreshing, setIsRefreshing]         = useState(false);
+
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
+  const scrollRef      = useRef<ScrollView>(null);
 
-  const intelligenceResult = useInteligence();
-  const { data: intelligenceSignals, isLoading, error } = intelligenceResult;
-  useEffect(() => {
-    if (intelligenceSignals?.signals) {
-      setSignals(intelligenceSignals.signals);
-    }
-  }, [intelligenceSignals]);
+  const queryParams = useMemo(() => {
+    const params: string[] = [];
+    if (activeSort) params.push(`sort=${activeSort}`);
+    const filterParam = FILTER_PARAMS[activeFilter];
+    if (filterParam) params.push(filterParam);
+    params.push(`page=${page}`);
+    return params;
+  }, [activeFilter, activeSort, page]);
 
-  useEffect(() => {
-    const iv = setInterval(
-      () => setScanningStateIndex((p) => (p + 1) % LOADING_STATES.length),
-      LOADING_STATE_INTERVAL_MS
-    );
-    return () => clearInterval(iv);
-  }, []);
+  const { data, isLoading, error, forcedRefetch } = useInteligence(queryParams);
+
+  const signals: Signal[] = data?.signals ?? [];
+  const total              = data?.total   ?? 0;
+  const pages              = data?.pages   ?? 1;
+
+  useEffect(() => { setPage(1); }, [activeFilter, activeSort]);
 
   const getCardAnimation = useCallback(
     (id: string) => {
@@ -1136,48 +1041,11 @@ export default function IntelligenceScreen() {
     [cardAnimations]
   );
 
-  const SaveSignal = async (
-      signalId: string,
-      status: string = "saved",
-    ): Promise<void> => {
-      setSaveLoading(true);
-      try {
-        const payload: SaveSignalRequest = { status };
-        const res = await api.patch<SaveSignalResponse>(
-          `/signals/${signalId}`,
-          payload,
-        );
-        if (res && signals) {
-          setSignals(prev =>
-            prev?.map(signal =>
-              signal.id === signalId
-                ? {
-                    ...signal,
-                    status: res.status,
-                    isSaved: res.isSaved,
-                  }
-                : signal
-            )
-          );
-        }
-      } catch (error) {
-        console.error("Error saving signal:", error);
-      } finally {
-        setSaveLoading(false);
-      }
-    };
-
-  const filteredAndSorted = useMemo(() => {
-    const strategy = FILTER_STRATEGIES[activeFilter];
-    const filtered = signals.filter((s) => (strategy ? strategy(s) : true));
-    return [...filtered].sort(SORT_STRATEGIES[activeSort]);
-  }, [activeFilter, activeSort, signals]);
-
   useEffect(() => {
-    if (filteredAndSorted.length === 0) return;
+    if (signals.length === 0) return;
     Animated.stagger(
       CARD_STAGGER_DELAY_MS,
-      filteredAndSorted.map((signal) => {
+      signals.map((signal) => {
         const anim = getCardAnimation(signal.id);
         anim.setValue(0);
         return Animated.timing(anim, {
@@ -1187,26 +1055,36 @@ export default function IntelligenceScreen() {
         });
       })
     ).start();
-  }, [filteredAndSorted, getCardAnimation]);
+  }, [signals, getCardAnimation]);
 
-  const toggleSave = (id: string) =>
-    setSavedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await forcedRefetch();
+    setIsRefreshing(false);
+  };
 
-  const activeSortLabel =
-    SORT_OPTIONS.find((o) => o.value === activeSort)?.label ?? "Sort";
+  const goToPage = (next: number) => {
+    setPage(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
-  if (isLoading) return <LoadingScreen theme={theme} />;
-  if (error != null) {
-    return (
-      <ErrorScreen
-        theme={theme}
-        onRetry={() => {
-          if (typeof (intelligenceResult as any).refetch === "function")
-            (intelligenceResult as any).refetch();
-        }}
-      />
-    );
-  }
+  const handleSave = async (signalId: string, isSaved: boolean) => {
+    setSaveLoading(true);
+    try {
+      const payload: SaveSignalRequest = { status: isSaved ? "new" : "saved" };
+      await api.patch<SaveSignalResponse>(`/signals/${signalId}`, payload);
+      await forcedRefetch();
+    } catch (err) {
+      console.error("Error saving signal:", err);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const activeSortLabel = SORT_OPTIONS.find((o) => o.value === activeSort)?.label ?? "Sort";
+
+  if (isLoading && !isRefreshing) return <LoadingScreen theme={theme} />;
+  if (error != null) return <ErrorScreen theme={theme} onRetry={forcedRefetch} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -1219,18 +1097,23 @@ export default function IntelligenceScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: 40,
-          gap: 12,
-        }}
+        ref={scrollRef}
+        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.accentBlue}
+            colors={[theme.colors.accentBlue]}
+          />
+        }
       >
-        {/* Stats bar — sits right below the tab header */}
-        {signals.length > 0 && <StatsBar signals={signals} total={intelligenceSignals?.total  || 0} theme={theme} />}
+        {signals.length > 0 && (
+          <StatsBar signals={signals} total={total} theme={theme} />
+        )}
 
-        {/* Fix #3: filters and sort on separate lines, visually aligned */}
-        {/* Filter row */}
+        {/* Filter pills */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1247,11 +1130,9 @@ export default function IntelligenceScreen() {
                       paddingHorizontal: 14,
                       paddingVertical: 7,
                       borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: selected
-                        ? theme.colors.textPrimary
-                        : theme.colors.border,
+                      borderColor: selected ? theme.colors.accentBlue : theme.colors.border,
                       backgroundColor: selected
-                        ? theme.colors.textPrimary
+                        ? theme.colors.accentBlue
                         : pressed
                         ? theme.colors.surfaceStrong
                         : theme.colors.surface,
@@ -1261,10 +1142,8 @@ export default function IntelligenceScreen() {
                     <Text
                       style={{
                         fontSize: 12,
-                        fontWeight: selected ? "600" : "400",
-                        color: selected
-                          ? theme.colors.background
-                          : theme.colors.textSecondary,
+                        fontWeight: selected ? "700" : "400",
+                        color: selected ? theme.colors.background : theme.colors.textSecondary,
                       }}
                     >
                       {filter}
@@ -1276,27 +1155,13 @@ export default function IntelligenceScreen() {
           })}
         </ScrollView>
 
-        {/* Sort + result count row — separate from filters */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "500",
-              color: theme.colors.textMuted,
-            }}
-          >
-            {filteredAndSorted.length} result
-            {filteredAndSorted.length !== 1 ? "s" : ""}
+        {/* Result count + sort */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={{ fontSize: 12, fontWeight: "500", color: theme.colors.textMuted }}>
+            {total} result{total !== 1 ? "s" : ""}
             {activeFilter !== "All" ? ` · ${activeFilter}` : ""}
           </Text>
 
-          {/* Fix #3: sort button its own row, proper weight */}
           <Pressable onPress={() => setSortSheetVisible(true)}>
             {({ pressed }) => (
               <View
@@ -1306,9 +1171,7 @@ export default function IntelligenceScreen() {
                   paddingVertical: 6,
                   borderWidth: StyleSheet.hairlineWidth,
                   borderColor: theme.colors.border,
-                  backgroundColor: pressed
-                    ? theme.colors.surfaceStrong
-                    : theme.colors.surface,
+                  backgroundColor: pressed ? theme.colors.surfaceStrong : theme.colors.surface,
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 5,
@@ -1316,13 +1179,7 @@ export default function IntelligenceScreen() {
                 }}
               >
                 <ArrowDownNarrowWide size={16} color={theme.colors.textMuted} />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "500",
-                    color: theme.colors.textSecondary,
-                  }}
-                >
+                <Text style={{ fontSize: 12, fontWeight: "500", color: theme.colors.textSecondary }}>
                   {activeSortLabel}
                 </Text>
               </View>
@@ -1332,28 +1189,33 @@ export default function IntelligenceScreen() {
 
         {/* Cards */}
         <View style={{ gap: 10 }}>
-          {filteredAndSorted.length === 0 ? (
+          {signals.length === 0 ? (
             <EmptyScreen theme={theme} filter={activeFilter} />
           ) : (
-            filteredAndSorted.map((item) => (
+            signals.map((item) => (
               <SignalCard
                 key={item.id}
                 item={item}
                 theme={theme}
                 loading={saveLoading}
                 saved={item?.isSaved ?? false}
-                onSave={() => SaveSignal(item.id, item?.isSaved ? "new" : "saved")}
+                onSave={() => handleSave(item.id, item?.isSaved ?? false)}
                 onView={() =>
-                  router.push({
-                    pathname: "/opportunity/[id]",
-                    params: { id: item.id },
-                  })
+                  router.push({ pathname: "/opportunity/[id]", params: { id: item.id } })
                 }
                 animation={getCardAnimation(item.id)}
               />
             ))
           )}
         </View>
+
+        <PaginationBar
+          page={page}
+          pages={pages}
+          onPrev={() => goToPage(page - 1)}
+          onNext={() => goToPage(page + 1)}
+          theme={theme}
+        />
       </ScrollView>
     </View>
   );
