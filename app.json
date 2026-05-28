@@ -7,13 +7,19 @@
     "scheme": "jobless",
     "userInterfaceStyle": "automatic",
     "icon": "./src/assets/logo.png",
-    "ios": {},
+    "ios": {
+      "bundleIdentifier": "com.chijex5.jobless",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
     "android": {
       "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/logo.png",
         "backgroundColor": "#f7f3ec"
-      }
+      },
+      "package": "com.chijex5.jobless"
     },
     "web": {
       "output": "static",
@@ -33,6 +39,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1646ba58-4016-4def-bfec-c2763a0f4dea"
+      }
     }
   }
 }
