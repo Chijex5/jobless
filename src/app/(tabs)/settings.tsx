@@ -10,10 +10,13 @@ import {
   View,
 } from 'react-native';
 
+import { useThemeStore } from '@/store/theme-store';
+
 import { ScreenShell } from '@/components/screen-shell';
 import { Card, Chip, SectionHeader } from '@/components/ui';
 import { useAppTheme } from '@/theme/use-app-theme';
 import { baseUrl } from '@/lib/backend';
+import { loadSettings, saveSettings } from '@/lib/storage/settings';
 
 const API_BASE = baseUrl;
 
@@ -266,6 +269,14 @@ export default function SettingsScreen() {
   // ── Scraping controls ──────────────────────────────────────────────────────
   const [scrapeInterval, setScrapeInterval] = useState('Every 30m');
   const [scraping, setScraping] = useState(true);
+  const {
+    overrideSystemTheme,
+    themeMode,
+    setOverrideSystemTheme,
+    setThemeMode,
+    hydrate,
+} = useThemeStore();
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // ── Scrape progress (polled) ───────────────────────────────────────────────
   const [scrapeEvent, setScrapeEvent] = useState<ScrapeEvent>({
@@ -302,11 +313,14 @@ export default function SettingsScreen() {
   const [highConfidenceOnly, setHighConfidenceOnly] = useState(false);
 
   // ── Appearance ────────────────────────────────────────────────────────────
-  const [darkMode, setDarkMode] = useState(theme.appearance === 'dark');
 
   // ── Fetch channels on mount ────────────────────────────────────────────────
   useEffect(() => {
     fetchChannels();
+  }, []);
+
+  useEffect(() => {
+    hydrate();
   }, []);
 
   async function fetchChannels() {
@@ -358,6 +372,32 @@ export default function SettingsScreen() {
   useEffect(() => {
     return () => stopPolling();
   }, []);
+
+  useEffect(() => {
+    async function bootstrap() {
+      const settings = await loadSettings();
+
+      setOverrideSystemTheme(settings.overrideSystemTheme);
+      setThemeMode(settings.themeMode);
+
+      setSettingsLoaded(true);
+    }
+
+    bootstrap();
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+
+    saveSettings({
+      overrideSystemTheme,
+      themeMode,
+    });
+  }, [
+    overrideSystemTheme,
+    themeMode,
+    settingsLoaded,
+  ]);
 
   // ── Force scrape ──────────────────────────────────────────────────────────
   async function handleForceScrape() {
@@ -824,21 +864,101 @@ export default function SettingsScreen() {
       </Card>
 
       {/* ── Appearance ────────────────────────────────────────────────────── */}
-      <SectionHeader theme={theme} title="Appearance" subtitle="Display preferences" />
+      <SectionHeader
+        theme={theme}
+        title="Appearance"
+        subtitle="Display preferences"
+      />
+
       <Card theme={theme}>
         <SettingRow
           theme={theme}
-          label="Dark mode"
-          sub="Override system theme"
+          label="Override system theme"
+          sub={
+            overrideSystemTheme
+              ? 'Using custom appearance'
+              : 'Following device appearance'
+          }
           right={
             <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: theme.colors.border, true: theme.colors.accentRose }}
+              value={overrideSystemTheme}
+              onValueChange={setOverrideSystemTheme}
+              trackColor={{
+                false: theme.colors.border,
+                true: theme.colors.accentRose,
+              }}
               thumbColor={theme.colors.textPrimary}
             />
           }
         />
+
+        {overrideSystemTheme && (
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 12,
+              paddingHorizontal: 16,
+              paddingBottom: 16,
+              paddingTop: 4,
+            }}
+          >
+            <Pressable
+              onPress={() => setThemeMode('light')}
+              style={{
+                flex: 1,
+                borderRadius: 14,
+                paddingVertical: 14,
+                borderWidth: 1,
+                borderColor:
+                  themeMode === 'light'
+                    ? theme.colors.accentRose
+                    : theme.colors.border,
+                backgroundColor:
+                  themeMode === 'light'
+                    ? theme.colors.accentRose + '20'
+                    : theme.colors.accentBlue,
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.colors.textPrimary,
+                  fontWeight: '600',
+                }}
+              >
+                Light
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setThemeMode('dark')}
+              style={{
+                flex: 1,
+                borderRadius: 14,
+                paddingVertical: 14,
+                borderWidth: 1,
+                borderColor:
+                  themeMode === 'dark'
+                    ? theme.colors.accentRose
+                    : theme.colors.border,
+                backgroundColor:
+                  themeMode === 'dark'
+                    ? theme.colors.accentRose + '20'
+                    : theme.colors.accentBlue,
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.colors.textPrimary,
+                  fontWeight: '600',
+                }}
+              >
+                Dark
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </Card>
 
       {/* ── Danger zone ───────────────────────────────────────────────────── */}

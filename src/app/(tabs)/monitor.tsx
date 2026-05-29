@@ -1,39 +1,45 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, Text, View, ActivityIndicator } from 'react-native';
 
 import { ScreenShell } from '@/components/screen-shell';
 import { Card, Chip, SectionHeader } from '@/components/ui';
 import { useAppTheme } from '@/theme/use-app-theme';
+import { baseUrl } from '@/lib/backend';
 
-// ── Static data ────────────────────────────────────────────────────────────
-const INITIAL_EVENTS = [
-  { id: 'e1', message: 'Scanning Twitter/X for internship signals…', at: 'Now', status: 'active' as const },
-  { id: 'e2', message: 'Detected new frontend internship — Stripe', at: '12s ago', status: 'info' as const },
-  { id: 'e3', message: 'AI extracted role: Frontend Engineer Intern', at: '29s ago', status: 'info' as const },
-  { id: 'e4', message: 'Ranked opportunity: 92% match', at: '46s ago', status: 'high' as const },
-  { id: 'e5', message: 'Opportunity queued for review', at: '1m ago', status: 'active' as const },
-  { id: 'e6', message: 'Extractor normalised 18 job post entities', at: '2m ago', status: 'info' as const },
-  { id: 'e7', message: 'Model confidence spike in AI startup cluster', at: '4m ago', status: 'high' as const },
-];
+const API_BASE = baseUrl;
+const POLL_INTERVAL_MS = 10_000;
 
-const PIPELINE_STAGES = [
-  { id: 'twitter', label: 'Twitter / X', count: '12,843', rate: '98.4%', active: true },
-  { id: 'extract', label: 'Extraction', count: '1,184', rate: '96.2%', active: true },
-  { id: 'analysis', label: 'AI Analysis', count: '947', rate: '93.7%', active: true },
-  { id: 'ranking', label: 'Ranking', count: '812', rate: '91.9%', active: true },
-  { id: 'queue', label: 'Queue', count: '274', rate: '89.5%', active: true },
-  { id: 'feed', label: 'User Feed', count: '122', rate: '99.1%', active: false },
-];
+// ── Types ──────────────────────────────────────────────────────────────────
+type AppTheme = ReturnType<typeof useAppTheme>;
+type EventStatus = 'active' | 'info' | 'high' | 'error';
 
-const ALERTS = [
-  { id: 'a1', text: 'High-quality internship detected — Stripe Frontend (92%).' },
-  { id: 'a2', text: 'Multiple frontend roles found in last scan window.' },
-  { id: 'a3', text: 'AI confidence spike detected in startup postings.' },
-];
+type PipelineEvent = {
+  id: string;
+  message: string;
+  status: EventStatus;
+  at: string;
+};
+
+type MonitorData = {
+  scrapeRunning:    boolean;
+  scrapePhase:      string;
+  scrapeProgress:   number;
+  currentSource:    string | null;
+  lastRun:          string | null;
+  lastSaved:        number | null;
+  nextRun:          string | null;
+  totalSignals:     number;
+  newSignals:       number;
+  savedSignals:     number;
+  highMatchSignals: number;
+  platformCounts:   Record<string, number>;
+  notifRunning:     boolean;
+  notifLastRun:     string | null;
+  notifLastCount:   number | null;
+  recentEvents:     PipelineEvent[];
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-type EventStatus = 'active' | 'info' | 'high';
-
 function usePulse() {
   const pulse = useRef(new Animated.Value(0.7)).current;
   useEffect(() => {
@@ -49,16 +55,32 @@ function usePulse() {
   return pulse;
 }
 
+function fmt(iso: string | null): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '—';
+  }
+}
+
+function relativeTime(iso: string): string {
+  try {
+    const diff = Date.now() - new Date(iso).getTime();
+    const s = Math.floor(diff / 1000);
+    if (s < 60)  return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60)  return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    return `${h}h ago`;
+  } catch {
+    return '';
+  }
+}
+
 // ── Sub-components ─────────────────────────────────────────────────────────
-function StatRow({
-  theme,
-  label,
-  value,
-}: {
-  theme: ReturnType<typeof useAppTheme>;
-  label: string;
-  value: string;
-}) {
+function StatRow({ theme, label, value }: { theme: AppTheme; label: string; value: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{label}</Text>
@@ -75,7 +97,7 @@ function OverviewCard({
   rows,
   accent,
 }: {
-  theme: ReturnType<typeof useAppTheme>;
+  theme: AppTheme;
   title: string;
   rows: Array<[string, string]>;
   accent?: string;
@@ -99,60 +121,21 @@ function OverviewCard({
   );
 }
 
-function PipelineStage({
-  theme,
-  stage,
-  isLast,
-}: {
-  theme: ReturnType<typeof useAppTheme>;
-  stage: (typeof PIPELINE_STAGES)[number];
-  isLast: boolean;
-}) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <View
-        style={{
-          minWidth: 118,
-          borderWidth: 1,
-          borderColor: stage.active ? theme.colors.accentRose : theme.colors.border,
-          backgroundColor: theme.colors.surfaceStrong,
-          borderRadius: theme.radius.sm,
-          padding: theme.spacing.xs,
-          gap: 3,
-        }}>
-        <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{stage.label}</Text>
-        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{stage.count}</Text>
-        <Text style={{ ...theme.typography.meta, color: theme.colors.textSecondary }}>
-          ✓ {stage.rate}
-        </Text>
-        <Chip
-          theme={theme}
-          label={stage.active ? 'Processing' : 'Standby'}
-          variant={stage.active ? 'blue' : 'default'}
-        />
-      </View>
-      {!isLast && (
-        <Text style={{ marginHorizontal: 6, color: theme.colors.textMuted, fontSize: 16 }}>→</Text>
-      )}
-    </View>
-  );
-}
-
 function LiveEvent({
   theme,
   event,
   variantMap,
 }: {
-  theme: ReturnType<typeof useAppTheme>;
-  event: (typeof INITIAL_EVENTS)[number];
-  variantMap: Record<EventStatus, 'blue' | 'violet' | 'warning'>;
+  theme: AppTheme;
+  event: PipelineEvent;
+  variantMap: Record<EventStatus, 'blue' | 'violet' | 'warning' | 'default'>;
 }) {
   return (
     <View
       style={{
         borderLeftWidth: 2,
         borderLeftColor:
-          event.status === 'high'
+          event.status === 'high' || event.status === 'error'
             ? theme.colors.accentRose
             : event.status === 'active'
               ? theme.colors.accentBlue ?? theme.colors.border
@@ -161,19 +144,60 @@ function LiveEvent({
         paddingVertical: 4,
         gap: 3,
       }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: theme.spacing.xs,
-        }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.xs }}>
         <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary, flex: 1 }}>
           {event.message}
         </Text>
         <Chip theme={theme} label={event.status} variant={variantMap[event.status]} />
       </View>
-      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{event.at}</Text>
+      <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+        {relativeTime(event.at)}
+      </Text>
+    </View>
+  );
+}
+
+// ── Platform breakdown row ─────────────────────────────────────────────────
+function PlatformRow({
+  theme,
+  name,
+  count,
+  total,
+}: {
+  theme: AppTheme;
+  name: string;
+  count: number;
+  total: number;
+}) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  const barAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(barAnim, {
+      toValue: pct / 100,
+      duration: 600,
+      useNativeDriver: false,
+    }).start();
+  }, [pct]);
+
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text style={{ ...theme.typography.meta, color: theme.colors.textSecondary }}>{name}</Text>
+        <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+          {count} · {pct}%
+        </Text>
+      </View>
+      <View style={{ height: 3, borderRadius: 2, backgroundColor: theme.colors.border, overflow: 'hidden' }}>
+        <Animated.View
+          style={{
+            height: '100%',
+            borderRadius: 2,
+            backgroundColor: theme.colors.accentBlue ?? theme.colors.accentRose,
+            width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+          }}
+        />
+      </View>
     </View>
   );
 }
@@ -182,26 +206,111 @@ function LiveEvent({
 export default function MonitorScreen() {
   const theme = useAppTheme();
   const pulse = usePulse();
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [lastRefresh, setLastRefresh] = useState('Just now');
-  const [refreshing, setRefreshing] = useState(false);
+
+  const [data, setData]         = useState<MonitorData | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const variantMap = useMemo(
-    (): Record<EventStatus, 'blue' | 'violet' | 'warning'> => ({
+    (): Record<EventStatus, 'blue' | 'violet' | 'warning' | 'default'> => ({
       active: 'blue',
-      info: 'violet',
-      high: 'warning',
+      info:   'violet',
+      high:   'warning',
+      error:  'default',
     }),
     [],
   );
 
-  function handleRefresh() {
-    if (refreshing) return;
-    setRefreshing(true);
-    setTimeout(() => {
-      setLastRefresh('Just now');
-      setRefreshing(false);
-    }, 1400);
+  const fetchMonitor = useCallback(async (isManual = false) => {
+    if (isManual) setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/monitor`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json: MonitorData = await res.json();
+      setData(json);
+      setError(false);
+      setLastRefresh(new Date());
+    } catch (e) {
+      console.error('Monitor fetch failed:', e);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial fetch + poll
+  useEffect(() => {
+    fetchMonitor();
+    pollRef.current = setInterval(() => fetchMonitor(), POLL_INTERVAL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [fetchMonitor]);
+
+  // ── Derived display values ─────────────────────────────────────────────
+  const platformEntries = useMemo(
+    () => Object.entries(data?.platformCounts ?? {}).sort((a, b) => b[1] - a[1]),
+    [data?.platformCounts],
+  );
+
+  const phaseLabel: Record<string, string> = {
+    fetching:   'Fetching sources',
+    validating: 'AI validation',
+    saving:     'Saving signals',
+    done:       'Complete',
+    idle:       'Idle',
+  };
+
+  const systemStatus = data?.scrapeRunning
+    ? 'Scraping'
+    : data?.notifRunning
+      ? 'Generating notifications'
+      : 'Idle';
+
+  const lastRefreshStr = lastRefresh
+    ? lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—';
+
+  // ── Loading skeleton ───────────────────────────────────────────────────
+  if (loading && !data) {
+    return (
+      <ScreenShell theme={theme} title="Monitor" subtitle="AI intelligence system status">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+          <ActivityIndicator size="large" color={theme.colors.accentRose} />
+          <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted, marginTop: 12 }}>
+            Loading monitor…
+          </Text>
+        </View>
+      </ScreenShell>
+    );
+  }
+
+  // ── Error state ────────────────────────────────────────────────────────
+  if (error && !data) {
+    return (
+      <ScreenShell theme={theme} title="Monitor" subtitle="AI intelligence system status">
+        <Card theme={theme}>
+          <Text style={{ ...theme.typography.body, color: theme.colors.accentRose }}>
+            Failed to load monitor data.
+          </Text>
+          <Pressable
+            onPress={() => fetchMonitor(true)}
+            style={({ pressed }) => ({
+              marginTop: theme.spacing.sm,
+              opacity: pressed ? 0.6 : 1,
+              alignSelf: 'flex-start',
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.xs,
+              borderRadius: theme.radius.sm,
+              backgroundColor: theme.colors.accentRose,
+            })}>
+            <Text style={{ ...theme.typography.body, color: '#fff', fontWeight: '600' }}>Retry</Text>
+          </Pressable>
+        </Card>
+      </ScreenShell>
+    );
   }
 
   return (
@@ -209,23 +318,23 @@ export default function MonitorScreen() {
 
       {/* ── System status bar ──────────────────────────────────────────── */}
       <Card theme={theme} style={{ backgroundColor: theme.colors.surfaceStrong }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>System active</Text>
+            <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>
+              {systemStatus}
+            </Text>
             <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
-              Live observability stream connected · refreshed {lastRefresh}
+              {data?.scrapeRunning
+                ? `${phaseLabel[data.scrapePhase] ?? data.scrapePhase} · ${data.scrapeProgress}%`
+                : `Refreshed ${lastRefreshStr} · next scrape ${fmt(data?.nextRun ?? null)}`
+              }
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
             <Pressable
-              onPress={handleRefresh}
+              onPress={() => fetchMonitor(true)}
               style={({ pressed }) => ({
-                opacity: pressed || refreshing ? 0.5 : 1,
+                opacity: pressed || loading ? 0.5 : 1,
                 paddingHorizontal: theme.spacing.sm,
                 paddingVertical: 4,
                 borderWidth: 1,
@@ -233,7 +342,7 @@ export default function MonitorScreen() {
                 borderRadius: theme.radius.sm,
               })}>
               <Text style={{ ...theme.typography.meta, color: theme.colors.textSecondary }}>
-                {refreshing ? 'Refreshing…' : 'Refresh'}
+                {loading ? 'Loading…' : 'Refresh'}
               </Text>
             </Pressable>
             <Animated.View
@@ -242,127 +351,137 @@ export default function MonitorScreen() {
                 width: 11,
                 height: 11,
                 borderRadius: 99,
-                backgroundColor: theme.colors.accentRose,
+                backgroundColor: data?.scrapeRunning
+                  ? theme.colors.accentRose
+                  : theme.colors.textMuted,
               }}
             />
           </View>
         </View>
+
+        {/* Progress bar — only visible while scrape is running */}
+        {data?.scrapeRunning && (
+          <View style={{ gap: 6, marginTop: theme.spacing.xs }}>
+            <View style={{ height: 3, borderRadius: 2, backgroundColor: theme.colors.border, overflow: 'hidden' }}>
+              <View
+                style={{
+                  height: '100%',
+                  borderRadius: 2,
+                  width: `${data.scrapeProgress}%`,
+                  backgroundColor: theme.colors.accentRose,
+                }}
+              />
+            </View>
+            {data.currentSource && (
+              <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+                {data.currentSource}
+              </Text>
+            )}
+          </View>
+        )}
       </Card>
 
-      {/* ── System health chips ────────────────────────────────────────── */}
+      {/* ── Pipeline state chips ───────────────────────────────────────── */}
       <Card theme={theme}>
-        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>System health</Text>
+        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Pipeline state</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: theme.spacing.xs }}>
-          <Chip theme={theme} label="CPU 37%" variant="default" />
-          <Chip theme={theme} label="Latency 184ms" variant="blue" />
-          <Chip theme={theme} label="Error rate 0.3%" variant="success" />
-          <Chip theme={theme} label="Uptime 12d 04h" variant="violet" />
-          <Chip theme={theme} label="Queue depth 17" variant="default" />
-          <Chip theme={theme} label="DB in sync" variant="success" />
+          <Chip
+            theme={theme}
+            label={data?.scrapeRunning ? `Scraper: ${phaseLabel[data.scrapePhase] ?? data.scrapePhase}` : 'Scraper: idle'}
+            variant={data?.scrapeRunning ? 'blue' : 'default'}
+          />
+          <Chip
+            theme={theme}
+            label={data?.notifRunning ? 'Notifications: generating' : 'Notifications: idle'}
+            variant={data?.notifRunning ? 'violet' : 'default'}
+          />
+          <Chip
+            theme={theme}
+            label={`Last saved: ${data?.lastSaved ?? 0} signals`}
+            variant="default"
+          />
+          {data?.notifLastCount != null && (
+            <Chip
+              theme={theme}
+              label={`${data.notifLastCount} notifications generated`}
+              variant="success"
+            />
+          )}
         </View>
       </Card>
 
-      {/* ── Overview cards grid ────────────────────────────────────────── */}
-      <SectionHeader theme={theme} title="Subsystem overview" subtitle="Key metrics per component" />
+      {/* ── Signal overview cards ──────────────────────────────────────── */}
+      <SectionHeader theme={theme} title="Signal overview" subtitle="Counts across the pipeline" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
         <OverviewCard
           theme={theme}
-          title="Crawler"
+          title="Feed"
           accent={theme.colors.accentRose}
           rows={[
-            ['State', 'Active'],
-            ['Tweets scanned', '12,843'],
-            ['Last scan', '14s ago'],
-            ['Rate limit', 'Healthy'],
+            ['Total signals', String(data?.totalSignals ?? 0)],
+            ['Unreviewed',    String(data?.newSignals    ?? 0)],
+            ['Saved',         String(data?.savedSignals  ?? 0)],
+            ['High match ≥80', String(data?.highMatchSignals ?? 0)],
           ]}
         />
         <OverviewCard
           theme={theme}
-          title="AI processing"
+          title="Scraper"
           accent={theme.colors.accentBlue ?? theme.colors.border}
           rows={[
-            ['Analysed', '1,184'],
-            ['Extraction success', '96.2%'],
-            ['Classification acc.', '93.7%'],
+            ['State',      data?.scrapeRunning ? 'Running' : 'Idle'],
+            ['Phase',      phaseLabel[data?.scrapePhase ?? 'idle'] ?? '—'],
+            ['Last run',   fmt(data?.lastRun ?? null)],
+            ['Next run',   fmt(data?.nextRun ?? null)],
           ]}
         />
         <OverviewCard
           theme={theme}
-          title="Ranking engine"
+          title="Notifications"
           rows={[
-            ['Ranked today', '812'],
-            ['High confidence', '204'],
-            ['Filter efficiency', '88.9%'],
-          ]}
-        />
-        <OverviewCard
-          theme={theme}
-          title="Database sync"
-          rows={[
-            ['Sync status', 'In sync'],
-            ['Last update', '21s ago'],
-            ['Backlog size', '17 items'],
+            ['State',      data?.notifRunning ? 'Running' : 'Idle'],
+            ['Last run',   fmt(data?.notifLastRun ?? null)],
+            ['Generated',  String(data?.notifLastCount ?? '—')],
           ]}
         />
       </View>
 
-      {/* ── Pipeline flow ──────────────────────────────────────────────── */}
-      <SectionHeader theme={theme} title="Pipeline flow" subtitle="Stage-by-stage throughput" />
-      <Card theme={theme}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: theme.spacing.xs,
-            }}>
-            {PIPELINE_STAGES.map((stage, idx) => (
-              <PipelineStage
-                key={stage.id}
-                theme={theme}
-                stage={stage}
-                isLast={idx === PIPELINE_STAGES.length - 1}
-              />
-            ))}
-          </View>
-        </ScrollView>
-      </Card>
+      {/* ── Platform breakdown ─────────────────────────────────────────── */}
+      {platformEntries.length > 0 && (
+        <>
+          <SectionHeader theme={theme} title="Sources" subtitle="Signals by platform" />
+          <Card theme={theme}>
+            <View style={{ gap: theme.spacing.sm }}>
+              {platformEntries.map(([name, count]) => (
+                <PlatformRow
+                  key={name}
+                  theme={theme}
+                  name={name}
+                  count={count}
+                  total={data?.totalSignals ?? 0}
+                />
+              ))}
+            </View>
+          </Card>
+        </>
+      )}
 
       {/* ── Live activity feed ─────────────────────────────────────────── */}
-      <SectionHeader theme={theme} title="Live activity" subtitle="Real-time pipeline events" />
+      <SectionHeader theme={theme} title="Pipeline events" subtitle="Last 15 logged events" />
       <Card theme={theme}>
-        <View style={{ gap: theme.spacing.sm }}>
-          {events.map((event) => (
-            <LiveEvent key={event.id} theme={theme} event={event} variantMap={variantMap} />
-          ))}
-        </View>
+        {!data?.recentEvents || data.recentEvents.length === 0 ? (
+          <Text style={{ ...theme.typography.body, color: theme.colors.textMuted }}>
+            No events yet. Run a scrape to see activity here.
+          </Text>
+        ) : (
+          <View style={{ gap: theme.spacing.sm }}>
+            {data.recentEvents.map((event) => (
+              <LiveEvent key={event.id} theme={theme} event={event} variantMap={variantMap} />
+            ))}
+          </View>
+        )}
       </Card>
 
-      {/* ── Intelligence alerts ────────────────────────────────────────── */}
-      <SectionHeader theme={theme} title="Intelligence alerts" subtitle="Actionable signals" />
-      <Card theme={theme}>
-        <View style={{ gap: theme.spacing.sm }}>
-          {ALERTS.map((alert) => (
-            <View
-              key={alert.id}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                gap: theme.spacing.sm,
-                borderRadius: theme.radius.sm,
-                backgroundColor: theme.colors.surfaceStrong,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                padding: theme.spacing.sm,
-              }}>
-              <Text style={{ color: theme.colors.accentRose, fontSize: 14, marginTop: 1 }}>●</Text>
-              <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary, flex: 1 }}>
-                {alert.text}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </Card>
     </ScreenShell>
   );
 }
