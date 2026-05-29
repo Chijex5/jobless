@@ -881,6 +881,7 @@ export default function QueueScreen() {
   const theme = useAppTheme();
 
   const { data: signalData, isLoading, error, forcedRefetch:  refetch } = useInteligence(["isSaved=true"]);
+  console.log("Fetched signals:", signalData?.signals);
 
   // localSignals — seeded from the feed, then mutated locally for pipeline tracking
   const [localSignals, setLocalSignals] = useState<IntelligenceSignal[]>([]);
@@ -909,10 +910,9 @@ export default function QueueScreen() {
       .filter((s) => !removedIds.has(s.id))
       .map((s) => ({
         ...s,
-        pipelineStage: stageMap[s.id] ?? 'new',
+        pipelineStage: stageMap[s.id] ?? s.status ?? 'new',
       }));
   }, [localSignals, stageMap, removedIds]);
-  console.log('All queue items:', allQueueItems);
 
   const counts = useMemo<Record<PipelineStage, number>>(
     () => ({

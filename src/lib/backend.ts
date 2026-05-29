@@ -1,4 +1,4 @@
-const baseUrl = "https://ai-scraper-tb7n.onrender.com";
+export const baseUrl = "http://192.168.228.58:8000";
 
 // create an easy to use API wrapper around fetch
 export async function request<T>(
