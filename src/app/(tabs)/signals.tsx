@@ -516,7 +516,6 @@ export default function SignalsScreen() {
     forceGenerate,
   } = useNotifications();
 
-  console.log('Grouped notifications:', grouped);
 
   if (loading) {
     return (

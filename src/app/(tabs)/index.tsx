@@ -1,7 +1,13 @@
 import { IntelligenceSignal } from "@/data/mock";
 import { useInteligence } from "@/hooks/useInteligence";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Modal,
@@ -10,43 +16,64 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import { ArrowDownNarrowWide } from "lucide-react-native";
+import { ArrowDownNarrowWide, Search, X } from "lucide-react-native";
 import { AppTheme } from "@/theme/tokens";
 import { LivePulse } from "@/components/ui";
 import { useAppTheme } from "@/theme/use-app-theme";
 import { api } from "@/lib/backend";
 
-const CARD_STAGGER_DELAY_MS    = 50;
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CARD_STAGGER_DELAY_MS      = 50;
 const CARD_ANIMATION_DURATION_MS = 280;
 const LOADING_STATE_INTERVAL_MS  = 1800;
-const LOADING_STATES = ["Scanning sources", "Ranking signals", "Calibrating fit"];
+const SOFT_SEARCH_DEBOUNCE_MS    = 800;  // pause-and-fetch, no loader
 
-const FILTERS = [
-  "All", "Frontend", "Backend", "AI", "Data",
-  "Remote", "Nigeria", "Global", "React", "Python",
+const LOADING_STATES = [
+  "Scanning sources",
+  "Ranking signals",
+  "Calibrating fit",
+];
+
+// ─── Filter configuration ─────────────────────────────────────────────────────
+
+type FilterParam =
+  | { role_category: string }
+  | { location_filter: string }
+  | { skill_filter: string }
+  | Record<string, never>;
+
+interface FilterConfig {
+  label: string;
+  params: FilterParam;
+}
+
+const FILTERS: FilterConfig[] = [
+  { label: "All",      params: {} },
+  { label: "Frontend", params: { role_category: "frontend" } },
+  { label: "Backend",  params: { role_category: "backend"  } },
+  { label: "AI / ML",  params: { role_category: "ai"       } },
+  { label: "Data",     params: { role_category: "data"     } },
+  { label: "Mobile",   params: { role_category: "mobile"   } },
+  { label: "DevOps",   params: { role_category: "devops"   } },
+  { label: "QA",       params: { role_category: "qa"       } },
+  { label: "Remote",   params: { location_filter: "remote"  } },
+  { label: "Nigeria",  params: { location_filter: "nigeria" } },
+  { label: "Global",   params: { location_filter: "global"  } },
+  { label: "React",    params: { skill_filter: "react"  } },
+  { label: "Python",   params: { skill_filter: "python" } },
+  { label: "Node.js",  params: { skill_filter: "node"   } },
 ];
 
 const SORT_OPTIONS: { label: string; value: SortValue }[] = [
-  { label: "Best match",  value: "match"    },
-  { label: "Oldest first", value: "newest"  },
-  { label: "Most recent", value: "oldest"   },
-  { label: "By platform", value: "platform" },
+  { label: "Best match",   value: "match"    },
+  { label: "Most recent",  value: "newest"   },
+  { label: "Oldest first", value: "oldest"   },
+  { label: "By platform",  value: "platform" },
 ];
-
-const FILTER_PARAMS: Record<string, string> = {
-  All:      "",
-  Frontend: "role=frontend",
-  Backend:  "role=backend",
-  AI:       "role=ai",
-  Data:     "role=data",
-  Remote:   "location=remote",
-  Nigeria:  "location=nigeria",
-  Global:   "location=global",
-  React:    "skill=react",
-  Python:   "skill=python",
-};
 
 const PLATFORM_LABELS: Record<string, string> = {
   remotive:  "Remotive",
@@ -67,6 +94,8 @@ interface SaveSignalResponse extends IntelligenceSignal {}
 type Signal    = IntelligenceSignal;
 type SortValue = "match" | "newest" | "oldest" | "platform";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function scoreLabel(score: number) {
   if (score >= 90) return "Excellent";
   if (score >= 80) return "Strong";
@@ -84,7 +113,7 @@ function scoreColor(score: number, theme: AppTheme): string {
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return "Recently";
   const diff = Date.now() - new Date(dateStr).getTime();
-  const h = Math.floor(diff / 3_600_000);
+  const h    = Math.floor(diff / 3_600_000);
   if (h < 1)  return "Just now";
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
@@ -101,9 +130,6 @@ function roleTypeBadgeColor(roleType: string, theme: AppTheme): string {
   return map[roleType] ?? theme.colors.textMuted;
 }
 
-// ─── hex opacity helper ───────────────────────────────────────────────────────
-// Appends a 2-char hex alpha to any 6-char hex colour.
-// Usage: alpha(theme.colors.accentBlue, "14")
 function alpha(hex: string, opacity: string): string {
   return `${hex}${opacity}`;
 }
@@ -127,7 +153,15 @@ function ScoreBadge({ score, theme }: { score: number; theme: AppTheme }) {
         borderColor: alpha(color, "35"),
       }}
     >
-      <Text style={{ fontSize: 22, fontWeight: "700", color, letterSpacing: -0.5, lineHeight: 26 }}>
+      <Text
+        style={{
+          fontSize: 22,
+          fontWeight: "700",
+          color,
+          letterSpacing: -0.5,
+          lineHeight: 26,
+        }}
+      >
         {score}
       </Text>
       <Text
@@ -160,7 +194,13 @@ function SkillTag({ tag, theme }: { tag: string; theme: AppTheme }) {
         paddingVertical: 4,
       }}
     >
-      <Text style={{ fontSize: 11, fontWeight: "500", color: theme.colors.textSecondary }}>
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: "500",
+          color: theme.colors.textSecondary,
+        }}
+      >
         {tag}
       </Text>
     </View>
@@ -169,7 +209,13 @@ function SkillTag({ tag, theme }: { tag: string; theme: AppTheme }) {
 
 // ─── WorkModeBadge ────────────────────────────────────────────────────────────
 
-function WorkModeBadge({ roleMode, theme }: { roleMode?: string | null; theme: AppTheme }) {
+function WorkModeBadge({
+  roleMode,
+  theme,
+}: {
+  roleMode?: string | null;
+  theme: AppTheme;
+}) {
   const isRemote = roleMode === "Remote";
   const isHybrid = roleMode === "Hybrid";
 
@@ -208,7 +254,14 @@ function WorkModeBadge({ roleMode, theme }: { roleMode?: string | null; theme: A
       }}
     >
       <Text style={{ fontSize: 8, color, lineHeight: 12 }}>{dot}</Text>
-      <Text style={{ fontSize: 11, fontWeight: "600", color, letterSpacing: 0.2 }}>
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: "600",
+          color,
+          letterSpacing: 0.2,
+        }}
+      >
         {roleMode ?? "On-site"}
       </Text>
     </View>
@@ -217,13 +270,16 @@ function WorkModeBadge({ roleMode, theme }: { roleMode?: string | null; theme: A
 
 // ─── PlatformBadge ────────────────────────────────────────────────────────────
 
-function PlatformBadge({ platform, theme }: { platform?: string | null; theme: AppTheme }) {
+function PlatformBadge({
+  platform,
+  theme,
+}: {
+  platform?: string | null;
+  theme: AppTheme;
+}) {
   const label = platformLabel(platform);
   if (!label) return null;
-
-  // All platforms use accentBlue — no special-casing external brand colours
   const color = theme.colors.accentBlue;
-
   return (
     <View
       style={{
@@ -238,9 +294,216 @@ function PlatformBadge({ platform, theme }: { platform?: string | null; theme: A
         borderColor: alpha(color, "28"),
       }}
     >
-      <Text style={{ fontSize: 10, fontWeight: "600", color, letterSpacing: 0.2 }}>
+      <Text
+        style={{
+          fontSize: 10,
+          fontWeight: "600",
+          color,
+          letterSpacing: 0.2,
+        }}
+      >
         {label}
       </Text>
+    </View>
+  );
+}
+
+// ─── SearchBar ────────────────────────────────────────────────────────────────
+//
+// Two search modes:
+//   • Soft  — debounced 800ms after the user pauses typing; results update
+//             silently in the background (no loader shown).
+//   • Hard  — triggered immediately when the user presses the keyboard's
+//             Search/Enter key; the full loading skeleton is shown.
+//
+// The component surfaces `onSoftSearch` and `onHardSearch` so the parent
+// can apply each mode's different loading behaviour.
+
+function SearchBar({
+  value,
+  onChangeText,
+  onSoftSearch,
+  onHardSearch,
+  isSoftSearching,
+  theme,
+}: {
+  value: string;
+  onChangeText: (text: string) => void;
+  onSoftSearch: (query: string) => void;
+  onHardSearch: (query: string) => void;
+  isSoftSearching: boolean;
+  theme: AppTheme;
+}) {
+  const [focused, setFocused]   = useState(false);
+  const borderAnim              = useRef(new Animated.Value(0)).current;
+  const softDebounce            = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef                = useRef<TextInput>(null);
+
+  useEffect(() => {
+    Animated.timing(borderAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  }, [focused]);
+
+  const borderColor = borderAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [theme.colors.border, theme.colors.accentBlue],
+  });
+
+  // Called on every keystroke — schedules a soft search after the user pauses.
+  const handleChange = (text: string) => {
+    onChangeText(text);
+
+    // Clear any pending soft-search timer.
+    if (softDebounce.current) clearTimeout(softDebounce.current);
+
+    // Schedule a soft search if there's something to search.
+    const trimmed = text.trim();
+    softDebounce.current = setTimeout(() => {
+      onSoftSearch(trimmed);
+    }, SOFT_SEARCH_DEBOUNCE_MS);
+  };
+
+  // Called when the user taps the keyboard's Search / Go / Enter key.
+  const handleSubmitEditing = () => {
+    // Cancel the in-flight soft debounce — hard search takes over.
+    if (softDebounce.current) clearTimeout(softDebounce.current);
+    onHardSearch(value.trim());
+  };
+
+  // Clear the field and reset both search states.
+  const handleClear = () => {
+    if (softDebounce.current) clearTimeout(softDebounce.current);
+    onChangeText("");
+    onSoftSearch("");   // silently clear backend results
+    inputRef.current?.focus();
+  };
+
+  // Cleanup on unmount.
+  useEffect(() => {
+    return () => {
+      if (softDebounce.current) clearTimeout(softDebounce.current);
+    };
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        borderColor,
+        backgroundColor: theme.colors.surface,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+      }}
+    >
+      {/* Icon — pulses subtly while a soft search is in-flight */}
+      <Animated.View style={{ opacity: isSoftSearching ? 0.45 : 1 }}>
+        <Search
+          size={16}
+          color={focused ? theme.colors.accentBlue : theme.colors.textMuted}
+          strokeWidth={2}
+        />
+      </Animated.View>
+
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={handleChange}
+        onSubmitEditing={handleSubmitEditing}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder="Search roles, companies, skills…"
+        placeholderTextColor={theme.colors.textMuted}
+        returnKeyType="search"   // shows "Search" label on the keyboard
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={{
+          flex: 1,
+          fontSize: 14,
+          color: theme.colors.textPrimary,
+          padding: 0,
+          margin: 0,
+        }}
+      />
+
+      {/* Soft-search activity indicator — three fading dots */}
+      {isSoftSearching && value.length > 0 && (
+        <SoftSearchIndicator theme={theme} />
+      )}
+
+      {value.length > 0 && !isSoftSearching && (
+        <Pressable onPress={handleClear} hitSlop={8}>
+          <View
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 9,
+              backgroundColor: theme.colors.textMuted,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={11} color={theme.colors.background} strokeWidth={2.5} />
+          </View>
+        </Pressable>
+      )}
+    </Animated.View>
+  );
+}
+
+// ─── SoftSearchIndicator ─────────────────────────────────────────────────────
+// Three small pulsing dots shown inside the search bar while a background
+// (soft) fetch is in-flight. Deliberately subtle — the user can keep typing.
+
+function SoftSearchIndicator({ theme }: { theme: AppTheme }) {
+  const dots = [
+    useRef(new Animated.Value(0.3)).current,
+    useRef(new Animated.Value(0.3)).current,
+    useRef(new Animated.Value(0.3)).current,
+  ];
+
+  useEffect(() => {
+    const animations = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 350,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0.3,
+            duration: 350,
+            useNativeDriver: true,
+          }),
+        ])
+      )
+    );
+    animations.forEach((a) => a.start());
+    return () => animations.forEach((a) => a.stop());
+  }, []);
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+      {dots.map((dot, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: theme.colors.accentBlue,
+            opacity: dot,
+          }}
+        />
+      ))}
     </View>
   );
 }
@@ -261,9 +524,18 @@ function SortSheet({
   theme: AppTheme;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <Pressable
-        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.6)",
+          justifyContent: "flex-end",
+        }}
         onPress={onClose}
       >
         <Pressable>
@@ -309,7 +581,10 @@ function SortSheet({
               return (
                 <Pressable
                   key={opt.value}
-                  onPress={() => { onSelect(opt.value); onClose(); }}
+                  onPress={() => {
+                    onSelect(opt.value);
+                    onClose();
+                  }}
                 >
                   {({ pressed }) => (
                     <View
@@ -319,7 +594,9 @@ function SortSheet({
                         justifyContent: "space-between",
                         paddingHorizontal: 20,
                         paddingVertical: 15,
-                        backgroundColor: pressed ? theme.colors.surfaceStrong : "transparent",
+                        backgroundColor: pressed
+                          ? theme.colors.surfaceStrong
+                          : "transparent",
                         borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
                         borderTopColor: theme.colors.border,
                       }}
@@ -328,7 +605,9 @@ function SortSheet({
                         style={{
                           fontSize: 15,
                           fontWeight: selected ? "600" : "400",
-                          color: selected ? theme.colors.textPrimary : theme.colors.textSecondary,
+                          color: selected
+                            ? theme.colors.textPrimary
+                            : theme.colors.textSecondary,
                         }}
                       >
                         {opt.label}
@@ -344,7 +623,13 @@ function SortSheet({
                             justifyContent: "center",
                           }}
                         >
-                          <Text style={{ fontSize: 11, color: theme.colors.background, fontWeight: "700" }}>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: theme.colors.background,
+                              fontWeight: "700",
+                            }}
+                          >
                             ✓
                           </Text>
                         </View>
@@ -369,15 +654,32 @@ function SkeletonCard({ theme, delay }: { theme: AppTheme; delay: number }) {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmer, { toValue: 0.7, duration: 900, delay, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0.3, duration: 900, useNativeDriver: true }),
+        Animated.timing(shimmer, {
+          toValue: 0.7,
+          duration: 900,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0.3,
+          duration: 900,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
 
-  const Block = ({ w, h = 10, radius = 4 }: { w: number | string; h?: number; radius?: number }) => (
+  const Block = ({
+    w,
+    h = 10,
+    radius = 4,
+  }: {
+    w: number | string;
+    h?: number;
+    radius?: number;
+  }) => (
     <Animated.View
       style={{
         width: w as any,
@@ -400,7 +702,13 @@ function SkeletonCard({ theme, delay }: { theme: AppTheme; delay: number }) {
         gap: 14,
       }}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
+      >
         <View style={{ gap: 8, flex: 1 }}>
           <Block w="40%" h={10} />
           <Block w="70%" h={18} />
@@ -411,7 +719,7 @@ function SkeletonCard({ theme, delay }: { theme: AppTheme; delay: number }) {
       <Block w="100%" h={1} radius={1} />
       <View style={{ gap: 7 }}>
         <Block w="100%" h={10} />
-        <Block w="80%"  h={10} />
+        <Block w="80%" h={10} />
       </View>
       <View style={{ flexDirection: "row", gap: 6 }}>
         <Block w={52} h={24} radius={theme.radius.sm} />
@@ -446,9 +754,22 @@ function LoadingScreen({ theme }: { theme: AppTheme }) {
         showsVerticalScrollIndicator={false}
         scrollEnabled={false}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingVertical: 4,
+          }}
+        >
           <LivePulse theme={theme} />
-          <Text style={{ fontSize: 12, fontWeight: "500", color: theme.colors.textMuted }}>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "500",
+              color: theme.colors.textMuted,
+            }}
+          >
             {LOADING_STATES[stateIndex]}
           </Text>
         </View>
@@ -462,7 +783,13 @@ function LoadingScreen({ theme }: { theme: AppTheme }) {
 
 // ─── ErrorScreen ──────────────────────────────────────────────────────────────
 
-function ErrorScreen({ theme, onRetry }: { theme: AppTheme; onRetry: () => void }) {
+function ErrorScreen({
+  theme,
+  onRetry,
+}: {
+  theme: AppTheme;
+  onRetry: () => void;
+}) {
   return (
     <View
       style={{
@@ -481,15 +808,29 @@ function ErrorScreen({ theme, onRetry }: { theme: AppTheme; onRetry: () => void 
           overflow: "hidden",
         }}
       >
-        {/* Error accent stripe — uses theme token */}
-        <View style={{ height: 3, backgroundColor: theme.colors.accentError }} />
+        <View
+          style={{ height: 3, backgroundColor: theme.colors.accentError }}
+        />
         <View style={{ padding: 16, gap: 16 }}>
           <View style={{ gap: 4 }}>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: theme.colors.textPrimary }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: theme.colors.textPrimary,
+              }}
+            >
               Feed unavailable
             </Text>
-            <Text style={{ fontSize: 13, color: theme.colors.textSecondary, lineHeight: 19 }}>
-              The intelligence feed failed to respond. Saved opportunities are unaffected.
+            <Text
+              style={{
+                fontSize: 13,
+                color: theme.colors.textSecondary,
+                lineHeight: 19,
+              }}
+            >
+              The intelligence feed failed to respond. Saved opportunities are
+              unaffected.
             </Text>
           </View>
           <Pressable onPress={onRetry}>
@@ -501,11 +842,19 @@ function ErrorScreen({ theme, onRetry }: { theme: AppTheme; onRetry: () => void 
                   borderColor: theme.colors.border,
                   paddingVertical: 13,
                   alignItems: "center",
-                  backgroundColor: pressed ? theme.colors.surfaceStrong : "transparent",
+                  backgroundColor: pressed
+                    ? theme.colors.surfaceStrong
+                    : "transparent",
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.textPrimary }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color: theme.colors.textPrimary,
+                  }}
+                >
                   Retry
                 </Text>
               </View>
@@ -519,7 +868,16 @@ function ErrorScreen({ theme, onRetry }: { theme: AppTheme; onRetry: () => void 
 
 // ─── EmptyScreen ──────────────────────────────────────────────────────────────
 
-function EmptyScreen({ theme, filter }: { theme: AppTheme; filter: string }) {
+function EmptyScreen({
+  theme,
+  filter,
+  searchQuery,
+}: {
+  theme: AppTheme;
+  filter: string;
+  searchQuery: string;
+}) {
+  const isSearch = searchQuery.length > 0;
   return (
     <View
       style={{
@@ -532,11 +890,28 @@ function EmptyScreen({ theme, filter }: { theme: AppTheme; filter: string }) {
         gap: 6,
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textMuted }}>
-        No {filter} signals
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: "600",
+          color: theme.colors.textMuted,
+        }}
+      >
+        {isSearch
+          ? `No results for "${searchQuery}"`
+          : `No ${filter} signals`}
       </Text>
-      <Text style={{ fontSize: 12, color: theme.colors.textMuted, textAlign: "center", lineHeight: 18 }}>
-        Try a different filter or check back soon.
+      <Text
+        style={{
+          fontSize: 12,
+          color: theme.colors.textMuted,
+          textAlign: "center",
+          lineHeight: 18,
+        }}
+      >
+        {isSearch
+          ? "Try a different keyword or clear the search."
+          : "Try a different filter or check back soon."}
       </Text>
     </View>
   );
@@ -544,14 +919,43 @@ function EmptyScreen({ theme, filter }: { theme: AppTheme; filter: string }) {
 
 // ─── StatsBar ─────────────────────────────────────────────────────────────────
 
-function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number; theme: AppTheme }) {
-  const remote    = signals.filter((s) => s.location?.toLowerCase().includes("remote")).length;
+function StatsBar({
+  signals,
+  total,
+  theme,
+}: {
+  signals: Signal[];
+  total: number;
+  theme: AppTheme;
+}) {
+  const remote    = signals.filter((s) =>
+    s.location?.toLowerCase().includes("remote")
+  ).length;
   const highMatch = signals.filter((s) => s.aiMatchScore >= 85).length;
-  const open      = signals.filter((s) => s.applicationStatus === "Open").length;
+  const open      = signals.filter(
+    (s) => s.applicationStatus === "Open"
+  ).length;
 
-  const Stat = ({ label, value, color }: { label: string; value: number; color: string }) => (
+  const Stat = ({
+    label,
+    value,
+    color,
+  }: {
+    label: string;
+    value: number;
+    color: string;
+  }) => (
     <View style={{ flex: 1, alignItems: "center", gap: 3 }}>
-      <Text style={{ fontSize: 22, fontWeight: "700", color, letterSpacing: -0.8 }}>{value}</Text>
+      <Text
+        style={{
+          fontSize: 22,
+          fontWeight: "700",
+          color,
+          letterSpacing: -0.8,
+        }}
+      >
+        {value}
+      </Text>
       <Text
         style={{
           fontSize: 10,
@@ -588,13 +992,13 @@ function StatsBar({ signals, total, theme }: { signals: Signal[]; total: number;
         paddingHorizontal: 8,
       }}
     >
-      <Stat label="Total"   value={total}     color={theme.colors.textPrimary}   />
+      <Stat label="Total"   value={total}     color={theme.colors.textPrimary}  />
       <Divider />
-      <Stat label="Remote"  value={remote}    color={theme.colors.accentBlue}    />
+      <Stat label="Remote"  value={remote}    color={theme.colors.accentBlue}   />
       <Divider />
-      <Stat label="≥85 fit" value={highMatch} color={theme.colors.accentRose}    />
+      <Stat label="≥85 fit" value={highMatch} color={theme.colors.accentRose}   />
       <Divider />
-      <Stat label="Open"    value={open}      color={theme.colors.accentViolet}  />
+      <Stat label="Open"    value={open}      color={theme.colors.accentViolet} />
     </View>
   );
 }
@@ -641,8 +1045,16 @@ function PaginationBar({
               transform: [{ scale: pressed && page > 1 ? 0.97 : 1 }],
             }}
           >
-            <Text style={{ fontSize: 14, color: theme.colors.textPrimary }}>←</Text>
-            <Text style={{ fontSize: 13, fontWeight: "500", color: theme.colors.textPrimary }}>
+            <Text style={{ fontSize: 14, color: theme.colors.textPrimary }}>
+              ←
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "500",
+                color: theme.colors.textPrimary,
+              }}
+            >
               Prev
             </Text>
           </View>
@@ -651,9 +1063,17 @@ function PaginationBar({
 
       <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
         Page{" "}
-        <Text style={{ fontWeight: "700", color: theme.colors.textPrimary }}>{page}</Text>
-        {" "}of{" "}
-        <Text style={{ fontWeight: "700", color: theme.colors.textPrimary }}>{pages}</Text>
+        <Text
+          style={{ fontWeight: "700", color: theme.colors.textPrimary }}
+        >
+          {page}
+        </Text>{" "}
+        of{" "}
+        <Text
+          style={{ fontWeight: "700", color: theme.colors.textPrimary }}
+        >
+          {pages}
+        </Text>
       </Text>
 
       <Pressable onPress={onNext} disabled={page >= pages}>
@@ -667,10 +1087,18 @@ function PaginationBar({
               transform: [{ scale: pressed && page < pages ? 0.97 : 1 }],
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: "500", color: theme.colors.textPrimary }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "500",
+                color: theme.colors.textPrimary,
+              }}
+            >
               Next
             </Text>
-            <Text style={{ fontSize: 14, color: theme.colors.textPrimary }}>→</Text>
+            <Text style={{ fontSize: 14, color: theme.colors.textPrimary }}>
+              →
+            </Text>
           </View>
         )}
       </Pressable>
@@ -727,7 +1155,9 @@ function SignalCard({
           backgroundColor: theme.colors.surface,
           borderRadius: theme.radius.lg,
           borderLeftWidth: 3,
-          borderLeftColor: isRemote ? theme.colors.accentSuccess : theme.colors.border,
+          borderLeftColor: isRemote
+            ? theme.colors.accentSuccess
+            : theme.colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderRightWidth: StyleSheet.hairlineWidth,
           borderBottomWidth: StyleSheet.hairlineWidth,
@@ -738,7 +1168,12 @@ function SignalCard({
         }}
       >
         {/* Score stripe */}
-        <View style={{ height: 2, backgroundColor: theme.colors.surfaceElevated }}>
+        <View
+          style={{
+            height: 2,
+            backgroundColor: theme.colors.surfaceElevated,
+          }}
+        >
           <View
             style={{
               height: "100%",
@@ -750,9 +1185,15 @@ function SignalCard({
         </View>
 
         <View style={{ padding: 16, gap: 12 }}>
-
           {/* ── Row 1: Company + Score ── */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 12,
+            }}
+          >
             <View style={{ flex: 1, gap: 4 }}>
               <Text
                 style={{
@@ -779,13 +1220,26 @@ function SignalCard({
                 {item.role}
               </Text>
 
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 6,
+                  flexWrap: "wrap",
+                }}
+              >
                 <WorkModeBadge roleMode={item.roleMode} theme={theme} />
 
                 {item.location &&
                   item.location !== "Unknown" &&
                   item.location !== "Remote" && (
-                    <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: theme.colors.textMuted,
+                      }}
+                    >
                       · {item.location}
                     </Text>
                   )}
@@ -798,11 +1252,22 @@ function SignalCard({
           </View>
 
           {/* ── Divider ── */}
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
+          <View
+            style={{
+              height: StyleSheet.hairlineWidth,
+              backgroundColor: theme.colors.border,
+            }}
+          />
 
           {/* ── AI summary ── */}
           {item.aiSummary != null && (
-            <Text style={{ fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary }}>
+            <Text
+              style={{
+                fontSize: 13,
+                lineHeight: 20,
+                color: theme.colors.textSecondary,
+              }}
+            >
               {item.aiSummary}
             </Text>
           )}
@@ -833,8 +1298,12 @@ function SignalCard({
               gap: 4,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <Text
+                style={{ fontSize: 11, color: theme.colors.textMuted }}
+              >
                 {timeAgo(item.postedAt)}
               </Text>
               {item.pay != null && (
@@ -848,7 +1317,13 @@ function SignalCard({
                     borderColor: alpha(theme.colors.accentBlue, "25"),
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.accentBlue }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "600",
+                      color: theme.colors.accentBlue,
+                    }}
+                  >
                     {item.pay}
                   </Text>
                 </View>
@@ -866,7 +1341,14 @@ function SignalCard({
                   borderColor: alpha(badgeColor, "28"),
                 }}
               >
-                <Text style={{ fontSize: 10, fontWeight: "600", color: badgeColor, letterSpacing: 0.3 }}>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "600",
+                    color: badgeColor,
+                    letterSpacing: 0.3,
+                  }}
+                >
                   {item.roleType}
                 </Text>
               </View>
@@ -893,10 +1375,20 @@ function SignalCard({
                     transform: [{ scale: pressed ? 0.97 : 1 }],
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: saved ? accent : theme.colors.textSecondary }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: saved ? accent : theme.colors.textSecondary,
+                    }}
+                  >
                     {loading
-                      ? saved ? "Removing..." : "Saving..."
-                      : saved ? "✓ Saved" : "Save"}
+                      ? saved
+                        ? "Removing…"
+                        : "Saving…"
+                      : saved
+                      ? "✓ Saved"
+                      : "Save"}
                   </Text>
                 </View>
               )}
@@ -912,17 +1404,29 @@ function SignalCard({
                     gap: 6,
                     borderRadius: theme.radius.md,
                     paddingVertical: 12,
-                    backgroundColor: pressed
-                      ? theme.colors.accentBlue
-                      : theme.colors.accentBlue,
+                    backgroundColor: theme.colors.accentBlue,
                     opacity: pressed ? 0.85 : 1,
                     transform: [{ scale: pressed ? 0.97 : 1 }],
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.background }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: theme.colors.background,
+                    }}
+                  >
                     View Opportunity
                   </Text>
-                  <Text style={{ fontSize: 12, color: theme.colors.background, opacity: 0.6 }}>↗</Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: theme.colors.background,
+                      opacity: 0.6,
+                    }}
+                  >
+                    ↗
+                  </Text>
                 </View>
               )}
             </Pressable>
@@ -939,7 +1443,13 @@ function SignalCard({
                   opacity: pressed ? 0.5 : 1,
                 }}
               >
-                <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
+                <View
+                  style={{
+                    flex: 1,
+                    height: StyleSheet.hairlineWidth,
+                    backgroundColor: theme.colors.border,
+                  }}
+                />
                 <Text
                   style={{
                     fontSize: 10,
@@ -950,7 +1460,13 @@ function SignalCard({
                 >
                   Source {sourceExpanded ? "▲" : "▼"}
                 </Text>
-                <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
+                <View
+                  style={{
+                    flex: 1,
+                    height: StyleSheet.hairlineWidth,
+                    backgroundColor: theme.colors.border,
+                  }}
+                />
               </View>
             )}
           </Pressable>
@@ -966,7 +1482,13 @@ function SignalCard({
                 gap: 8,
               }}
             >
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <Text
                   style={{
                     fontSize: 10,
@@ -978,7 +1500,9 @@ function SignalCard({
                 >
                   {item.platform} · @{item.sourceHandle}
                 </Text>
-                <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>
+                <Text
+                  style={{ fontSize: 10, color: theme.colors.textMuted }}
+                >
                   {item.applicationStatus}
                 </Text>
               </View>
@@ -1006,32 +1530,80 @@ export default function IntelligenceScreen() {
   const theme  = useAppTheme();
   const router = useRouter();
 
-  const [activeFilter, setActiveFilter]         = useState("All");
-  const [activeSort, setActiveSort]             = useState<SortValue>("match");
-  const [page, setPage]                         = useState(1);
-  const [sortSheetVisible, setSortSheetVisible] = useState(false);
-  const [saveLoading, setSaveLoading]           = useState(false);
-  const [isRefreshing, setIsRefreshing]         = useState(false);
+  const [activeFilterIndex, setActiveFilterIndex] = useState(0);
+  const [activeSort, setActiveSort]               = useState<SortValue>("match");
+  const [page, setPage]                           = useState(1);
+  const [sortSheetVisible, setSortSheetVisible]   = useState(false);
+  const [saveLoading, setSaveLoading]             = useState(false);
+  const [isRefreshing, setIsRefreshing]           = useState(false);
+
+  // ── Search state ──────────────────────────────────────────────────────────
+  //
+  // searchInput   — raw value bound to the TextInput (updates on every keystroke)
+  // searchQuery   — the value actually sent to the backend
+  // searchMode    — "soft" | "hard" | null
+  //                 "soft" → background fetch, no skeleton
+  //                 "hard" → intentional submit, show full loader
+  //
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMode, setSearchMode]   = useState<"soft" | "hard" | null>(null);
+
+  // isSoftSearching is true only between the debounce firing and the result
+  // arriving — used to show the subtle dots indicator inside the search bar.
+  const [isSoftSearching, setIsSoftSearching] = useState(false);
+
+  // Called by SearchBar when the user pauses typing (debounced 800ms).
+  const handleSoftSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    setPage(1);
+    setSearchMode("soft");
+    setIsSoftSearching(true);
+  }, []);
+
+  // Called by SearchBar when the user hits the keyboard Search/Enter key.
+  const handleHardSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    setPage(1);
+    setSearchMode("hard");
+    setIsSoftSearching(false); // dots go away; full loader takes over
+  }, []);
 
   const cardAnimations = useRef<Record<string, Animated.Value>>({}).current;
   const scrollRef      = useRef<ScrollView>(null);
 
+  const activeFilter = FILTERS[activeFilterIndex];
+
+  // ── Build query params ────────────────────────────────────────────────────
   const queryParams = useMemo(() => {
     const params: string[] = [];
     if (activeSort) params.push(`sort=${activeSort}`);
-    const filterParam = FILTER_PARAMS[activeFilter];
-    if (filterParam) params.push(filterParam);
+
+    const fp = activeFilter.params as Record<string, string>;
+    for (const [key, val] of Object.entries(fp)) {
+      if (val) params.push(`${key}=${encodeURIComponent(val)}`);
+    }
+
+    if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
     params.push(`page=${page}`);
     return params;
-  }, [activeFilter, activeSort, page]);
+  }, [activeFilter, activeSort, page, searchQuery]);
 
   const { data, isLoading, error, forcedRefetch } = useInteligence(queryParams);
+
+  // When new data arrives after a soft search, stop the dots indicator.
+  useEffect(() => {
+    if (!isLoading && searchMode === "soft") {
+      setIsSoftSearching(false);
+    }
+  }, [isLoading, searchMode]);
 
   const signals: Signal[] = data?.signals ?? [];
   const total              = data?.total   ?? 0;
   const pages              = data?.pages   ?? 1;
 
-  useEffect(() => { setPage(1); }, [activeFilter, activeSort]);
+  // Reset to page 1 on filter/sort change (search changes are handled above).
+  useEffect(() => { setPage(1); }, [activeFilterIndex, activeSort]);
 
   const getCardAnimation = useCallback(
     (id: string) => {
@@ -1081,10 +1653,25 @@ export default function IntelligenceScreen() {
     }
   };
 
-  const activeSortLabel = SORT_OPTIONS.find((o) => o.value === activeSort)?.label ?? "Sort";
+  const activeSortLabel =
+    SORT_OPTIONS.find((o) => o.value === activeSort)?.label ?? "Sort";
 
-  if (isLoading && !isRefreshing) return <LoadingScreen theme={theme} />;
-  if (error != null) return <ErrorScreen theme={theme} onRetry={forcedRefetch} />;
+  const activeFilterLabel =
+    activeFilterIndex === 0 ? "" : ` · ${activeFilter.label}`;
+
+  // ── Render guards ─────────────────────────────────────────────────────────
+  //
+  // Show the full skeleton loader only for:
+  //   • Initial page load
+  //   • Hard search (user pressed Enter)
+  //   • Pull-to-refresh
+  //
+  // Soft searches never show the skeleton — results update in the background.
+  const showFullLoader =
+    isLoading && !isRefreshing && searchMode !== "soft";
+
+  if (showFullLoader) return <LoadingScreen theme={theme} />;
+  if (error != null)  return <ErrorScreen theme={theme} onRetry={forcedRefetch} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -1109,20 +1696,37 @@ export default function IntelligenceScreen() {
           />
         }
       >
+        {/* ── Search bar ── */}
+        <SearchBar
+          value={searchInput}
+          onChangeText={setSearchInput}
+          onSoftSearch={handleSoftSearch}
+          onHardSearch={handleHardSearch}
+          isSoftSearching={isSoftSearching}
+          theme={theme}
+        />
+
+        {/* ── Stats bar ── */}
         {signals.length > 0 && (
           <StatsBar signals={signals} total={total} theme={theme} />
         )}
 
-        {/* Filter pills */}
+        {/* ── Filter pills ── */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 6 }}
         >
-          {FILTERS.map((filter) => {
-            const selected = activeFilter === filter;
+          {FILTERS.map((filter, index) => {
+            const selected = activeFilterIndex === index;
             return (
-              <Pressable key={filter} onPress={() => setActiveFilter(filter)}>
+              <Pressable
+                key={filter.label}
+                onPress={() => {
+                  setActiveFilterIndex(index);
+                  setPage(1);
+                }}
+              >
                 {({ pressed }) => (
                   <View
                     style={{
@@ -1130,7 +1734,9 @@ export default function IntelligenceScreen() {
                       paddingHorizontal: 14,
                       paddingVertical: 7,
                       borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: selected ? theme.colors.accentBlue : theme.colors.border,
+                      borderColor: selected
+                        ? theme.colors.accentBlue
+                        : theme.colors.border,
                       backgroundColor: selected
                         ? theme.colors.accentBlue
                         : pressed
@@ -1143,10 +1749,12 @@ export default function IntelligenceScreen() {
                       style={{
                         fontSize: 12,
                         fontWeight: selected ? "700" : "400",
-                        color: selected ? theme.colors.background : theme.colors.textSecondary,
+                        color: selected
+                          ? theme.colors.background
+                          : theme.colors.textSecondary,
                       }}
                     >
-                      {filter}
+                      {filter.label}
                     </Text>
                   </View>
                 )}
@@ -1155,11 +1763,24 @@ export default function IntelligenceScreen() {
           })}
         </ScrollView>
 
-        {/* Result count + sort */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 12, fontWeight: "500", color: theme.colors.textMuted }}>
+        {/* ── Result count + sort ── */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "500",
+              color: theme.colors.textMuted,
+            }}
+          >
             {total} result{total !== 1 ? "s" : ""}
-            {activeFilter !== "All" ? ` · ${activeFilter}` : ""}
+            {activeFilterLabel}
+            {searchQuery ? ` · "${searchQuery}"` : ""}
           </Text>
 
           <Pressable onPress={() => setSortSheetVisible(true)}>
@@ -1171,15 +1792,26 @@ export default function IntelligenceScreen() {
                   paddingVertical: 6,
                   borderWidth: StyleSheet.hairlineWidth,
                   borderColor: theme.colors.border,
-                  backgroundColor: pressed ? theme.colors.surfaceStrong : theme.colors.surface,
+                  backgroundColor: pressed
+                    ? theme.colors.surfaceStrong
+                    : theme.colors.surface,
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 5,
                   transform: [{ scale: pressed ? 0.96 : 1 }],
                 }}
               >
-                <ArrowDownNarrowWide size={16} color={theme.colors.textMuted} />
-                <Text style={{ fontSize: 12, fontWeight: "500", color: theme.colors.textSecondary }}>
+                <ArrowDownNarrowWide
+                  size={16}
+                  color={theme.colors.textMuted}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "500",
+                    color: theme.colors.textSecondary,
+                  }}
+                >
                   {activeSortLabel}
                 </Text>
               </View>
@@ -1187,10 +1819,14 @@ export default function IntelligenceScreen() {
           </Pressable>
         </View>
 
-        {/* Cards */}
+        {/* ── Cards ── */}
         <View style={{ gap: 10 }}>
           {signals.length === 0 ? (
-            <EmptyScreen theme={theme} filter={activeFilter} />
+            <EmptyScreen
+              theme={theme}
+              filter={activeFilter.label}
+              searchQuery={searchQuery}
+            />
           ) : (
             signals.map((item) => (
               <SignalCard
@@ -1201,7 +1837,10 @@ export default function IntelligenceScreen() {
                 saved={item?.isSaved ?? false}
                 onSave={() => handleSave(item.id, item?.isSaved ?? false)}
                 onView={() =>
-                  router.push({ pathname: "/opportunity/[id]", params: { id: item.id } })
+                  router.push({
+                    pathname: "/opportunity/[id]",
+                    params: { id: item.id },
+                  })
                 }
                 animation={getCardAnimation(item.id)}
               />

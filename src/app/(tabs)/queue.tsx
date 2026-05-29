@@ -881,7 +881,6 @@ export default function QueueScreen() {
   const theme = useAppTheme();
 
   const { data: signalData, isLoading, error, forcedRefetch:  refetch } = useInteligence(["isSaved=true"]);
-  console.log("Fetched signals:", signalData?.signals);
 
   // localSignals — seeded from the feed, then mutated locally for pipeline tracking
   const [localSignals, setLocalSignals] = useState<IntelligenceSignal[]>([]);
