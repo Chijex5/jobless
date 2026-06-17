@@ -1799,7 +1799,7 @@ export default function IntelligenceScreen() {
               letterSpacing: -0.6,
             }}
           >
-            Today's matches
+            Today&apos;s matches
           </Text>
           <Text
             style={{
