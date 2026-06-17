@@ -15,6 +15,8 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Bookmark, ChevronLeft } from "lucide-react-native";
 
 import { api } from "@/lib/backend";
 
@@ -24,6 +26,7 @@ import {
 } from "@/hooks/useInteligence";
 import { useAppTheme } from "@/theme/use-app-theme";
 import { IntelligenceSignal } from "@/data/mock";
+import { ScoreRing } from "@/components/ui";
 
 import type { AppTheme } from "@/theme/tokens";
 
@@ -44,10 +47,18 @@ function getStrengthLabel(score: number): string {
 }
 
 function scoreColor(score: number, theme: AppTheme): string {
-  if (score >= 90) return theme.colors.accentRose;
-  if (score >= 80) return theme.colors.accentBlue;
-  if (score >= 70) return theme.colors.accentViolet;
-  return theme.colors.textMuted;
+  return score >= 70 ? theme.colors.accentBlue : theme.colors.textMuted;
+}
+
+function initials(text: string): string {
+  return (
+    (text ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
 }
 
 function formatRelativeTime(hoursAgo: number): string {
@@ -78,8 +89,8 @@ function SectionCard({
     <View
       style={[
         {
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.radius.lg,
+          backgroundColor: theme.colors.surfaceStrong,
+          borderRadius: 20,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: theme.colors.border,
           padding: 16,
@@ -90,6 +101,22 @@ function SectionCard({
     >
       {children}
     </View>
+  );
+}
+
+function SectionLabel({ theme, children }: { theme: AppTheme; children: React.ReactNode }) {
+  return (
+    <Text
+      style={{
+        fontSize: 11,
+        fontFamily: theme.fontFamily.monoRegular,
+        color: theme.colors.textMuted,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+      }}
+    >
+      {children}
+    </Text>
   );
 }
 
@@ -108,19 +135,18 @@ function SkillChip({ label, theme }: { label: string; theme: AppTheme }) {
   return (
     <View
       style={{
-        borderRadius: theme.radius.sm,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surfaceStrong,
-        paddingHorizontal: 9,
-        paddingVertical: 4,
+        borderRadius: theme.radius.pill,
+        backgroundColor: theme.colors.surfaceElevated,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
       }}
     >
       <Text
         style={{
           fontSize: 11,
-          fontWeight: "500",
-          color: theme.colors.textSecondary,
+          fontWeight: "600",
+          fontFamily: theme.fontFamily.sansSemiBold,
+          color: theme.colors.accentBlue,
         }}
       >
         {label}
@@ -141,15 +167,145 @@ function StatusChip({
   return (
     <View
       style={{
-        borderRadius: theme.radius.sm,
+        borderRadius: theme.radius.pill,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: `${color}28`,
         backgroundColor: `${color}12`,
-        paddingHorizontal: 9,
-        paddingVertical: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
       }}
     >
-      <Text style={{ fontSize: 11, fontWeight: "600", color }}>{label}</Text>
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: "600",
+          fontFamily: theme.fontFamily.sansSemiBold,
+          color,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function CompanyAvatar({
+  label,
+  theme,
+  size = 52,
+}: {
+  label: string;
+  theme: AppTheme;
+  size?: number;
+}) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: theme.radius.md,
+        backgroundColor: theme.colors.surfaceStrong,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.border,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: size >= 48 ? 18 : 14,
+          fontFamily: theme.fontFamily.monoRegular,
+          color: theme.colors.textSecondary,
+        }}
+      >
+        {initials(label)}
+      </Text>
+    </View>
+  );
+}
+
+function DetailHeader({
+  theme,
+  insetsTop,
+  score,
+  isSaved,
+  saveLoading,
+  onBack,
+  onToggleSave,
+}: {
+  theme: AppTheme;
+  insetsTop: number;
+  score: number;
+  isSaved: boolean;
+  saveLoading: boolean;
+  onBack: () => void;
+  onToggleSave: () => void;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: theme.colors.background,
+        paddingTop: insetsTop + 8,
+        paddingBottom: 10,
+        paddingHorizontal: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <Pressable onPress={onBack}>
+        {({ pressed }) => (
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: theme.colors.surfaceStrong,
+              opacity: pressed ? 0.7 : 1,
+            }}
+          >
+            <ChevronLeft size={20} color={theme.colors.textPrimary} />
+          </View>
+        )}
+      </Pressable>
+
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: theme.fontFamily.monoRegular,
+          color: theme.colors.textMuted,
+          textTransform: "uppercase",
+          letterSpacing: 0.8,
+        }}
+      >
+        MATCH · {Math.round(score)}
+      </Text>
+
+      <Pressable onPress={onToggleSave} disabled={saveLoading}>
+        {({ pressed }) => (
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: isSaved
+                ? theme.colors.accentBlue
+                : theme.colors.surfaceStrong,
+              opacity: pressed ? 0.7 : 1,
+            }}
+          >
+            <Bookmark
+              size={17}
+              color={isSaved ? "#FFFFFF" : theme.colors.textPrimary}
+              fill={isSaved ? "#FFFFFF" : "transparent"}
+            />
+          </View>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -459,6 +615,7 @@ function ErrorScreen({
 
 export default function OpportunityDetailScreen() {
   const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -558,9 +715,6 @@ export default function OpportunityDetailScreen() {
     outputRange: [0, 1],
   });
 
-  const accent = signal
-    ? scoreColor(signal.aiMatchScore, theme)
-    : theme.colors.textSecondary;
   const strength = signal ? getStrengthLabel(signal.aiMatchScore) : null;
 
   const animatedSection = (index: number, children: React.ReactNode) => (
@@ -677,6 +831,16 @@ export default function OpportunityDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <DetailHeader
+        theme={theme}
+        insetsTop={insets.top}
+        score={signal.aiMatchScore}
+        isSaved={isSaved}
+        saveLoading={saveLoading}
+        onBack={handleBack}
+        onToggleSave={() => SaveSignal(signal.id, isSaved ? "new" : "saved")}
+      />
       <ScrollView
         contentContainerStyle={{
           padding: 16,
@@ -688,91 +852,28 @@ export default function OpportunityDetailScreen() {
         {/* ── 0: Header card ── */}
         {animatedSection(
           0,
-          <SectionCard theme={theme}>
+          <SectionCard theme={theme} style={{ backgroundColor: theme.colors.surface }}>
             {/* Company + role */}
-            <View style={{ gap: 3 }}>
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: "500",
-                  color: theme.colors.textMuted,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.4,
-                }}
-              >
-                {signal.company ?? "Unknown"}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: "700",
-                  color: theme.colors.textPrimary,
-                  letterSpacing: -0.5,
-                  lineHeight: 28,
-                }}
-              >
-                {signal.role}
-              </Text>
-              <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
-                {signal.location} · {timeAgo(signal.postedAt)}
-                {signal.pay != null ? ` · ${signal.pay}` : ''}
-              </Text>
-            </View>
-
-            <Divider theme={theme} />
-
-            {/* Match score block */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: `${accent}0E`,
-                borderRadius: theme.radius.md,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: `${accent}28`,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-              }}
-            >
-              <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+              <CompanyAvatar label={signal.company ?? signal.role} theme={theme} />
+              <View style={{ flex: 1, gap: 3 }}>
                 <Text
                   style={{
-                    fontSize: 11,
-                    fontWeight: '600',
-                    color: accent,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
+                    fontSize: 23,
+                    fontFamily: theme.fontFamily.sansExtraBold,
+                    fontWeight: "800",
+                    color: theme.colors.textPrimary,
+                    letterSpacing: -0.5,
+                    lineHeight: 28,
                   }}
                 >
-                  {strength}
+                  {signal.role}
                 </Text>
                 <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
-                  AI confidence score
+                  {signal.company ?? "Unknown"} · {signal.location}
+                  {signal.pay != null ? ` · ${signal.pay}` : ""}
                 </Text>
-                {signal.pay != null && (
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '600',
-                      color: theme.colors.textPrimary,
-                      marginTop: 4,
-                    }}
-                  >
-                    {signal.pay}
-                  </Text>
-                )}
               </View>
-              <Text
-                style={{
-                  fontSize: 36,
-                  fontWeight: '700',
-                  color: accent,
-                  letterSpacing: -1,
-                }}
-              >
-                {signal.aiMatchScore}
-              </Text>
             </View>
 
             {/* Mode + status pills */}
@@ -781,7 +882,7 @@ export default function OpportunityDetailScreen() {
                 label={signal.roleMode ?? "On-site"}
                 color={
                   signal.roleMode === "Remote"
-                    ? theme.colors.accentRose
+                    ? theme.colors.accentBlue
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -790,7 +891,7 @@ export default function OpportunityDetailScreen() {
                 label={signal.applicationStatus}
                 color={
                   signal.applicationStatus === "Open"
-                    ? theme.colors.accentRose
+                    ? theme.colors.accentBlue
                     : theme.colors.textMuted
                 }
                 theme={theme}
@@ -804,21 +905,53 @@ export default function OpportunityDetailScreen() {
           </SectionCard>,
         )}
 
+        {/* ── Score banner ── */}
+        {animatedSection(
+          0,
+          <View
+            style={{
+              backgroundColor: theme.colors.surfaceStrong,
+              borderRadius: 20,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: theme.colors.border,
+              padding: 18,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <ScoreRing theme={theme} score={signal.aiMatchScore} size={88} showSuffix />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontFamily: theme.fontFamily.monoRegular,
+                  color: theme.colors.accentBlue,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.6,
+                }}
+              >
+                {strength}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  lineHeight: 19,
+                  color: theme.colors.textSecondary,
+                }}
+                numberOfLines={3}
+              >
+                {signal.skillAlignment ?? signal.aiSummary ?? "AI match summary unavailable."}
+              </Text>
+            </View>
+          </View>,
+        )}
+
         {/* ── 1: AI Insight ── */}
         {animatedSection(
           1,
           <SectionCard theme={theme}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: theme.colors.textMuted,
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-              }}
-            >
-              AI insight
-            </Text>
+            <SectionLabel theme={theme}>AI insight</SectionLabel>
 
             {signal.aiSummary != null && (
               <Text
@@ -871,17 +1004,7 @@ export default function OpportunityDetailScreen() {
         {animatedSection(
           2,
           <SectionCard theme={theme}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: theme.colors.textMuted,
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-              }}
-            >
-              Skills detected
-            </Text>
+            <SectionLabel theme={theme}>Skills detected</SectionLabel>
 
             {(signal.skillTags ?? []).length > 0 && (
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
@@ -926,101 +1049,87 @@ export default function OpportunityDetailScreen() {
         {animatedSection(
           3,
           <SectionCard theme={theme}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: theme.colors.textMuted,
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-              }}
-            >
-              Actions
-            </Text>
+            <SectionLabel theme={theme}>Actions</SectionLabel>
 
-            {/* Primary CTA */}
-            <Pressable onPress={() => Linking.openURL(signal?.applyLink || signal.sourceUrl)}>
-              {({ pressed }) => (
-                <View
-                  style={{
-                    borderRadius: theme.radius.md,
-                    paddingVertical: 13,
-                    alignItems: "center",
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    gap: 6,
-                    backgroundColor: pressed
-                      ? theme.colors.textSecondary
-                      : theme.colors.textPrimary,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: "600",
-                      color: theme.colors.background,
-                    }}
-                  >
-                    Apply now
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: theme.colors.background,
-                      opacity: 0.55,
-                    }}
-                  >
-                    ↗
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            {/* Secondary actions */}
+            {/* Primary CTA + bookmark, bottom-action-bar style */}
             <View style={{ flexDirection: "row", gap: 8 }}>
               <Pressable
                 onPress={() => SaveSignal(signal.id, isSaved ? "new" : "saved")}
-                style={{ flex: 1 }}
+                disabled={saveLoading}
               >
                 {({ pressed }) => (
                   <View
                     style={{
-                      borderRadius: theme.radius.md,
-                      paddingVertical: 11,
+                      width: 48,
+                      height: 48,
+                      borderRadius: 15,
                       alignItems: "center",
+                      justifyContent: "center",
                       borderWidth: StyleSheet.hairlineWidth,
                       borderColor: isSaved
                         ? theme.colors.accentBlue
                         : theme.colors.border,
                       backgroundColor: isSaved
-                        ? `${signal.isSaved ? theme.colors.accentBlue : "transparent"}12`
+                        ? `${theme.colors.accentBlue}12`
                         : pressed
                           ? theme.colors.surfaceStrong
-                          : "transparent",
-                      transform: [{ scale: pressed ? 0.97 : 1 }],
+                          : theme.colors.surface,
+                      opacity: pressed ? 0.85 : 1,
+                    }}
+                  >
+                    <Bookmark
+                      size={19}
+                      color={isSaved ? theme.colors.accentBlue : theme.colors.textSecondary}
+                      fill={isSaved ? theme.colors.accentBlue : "transparent"}
+                    />
+                  </View>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => Linking.openURL(signal?.applyLink || signal.sourceUrl)}
+                style={{ flex: 1 }}
+              >
+                {({ pressed }) => (
+                  <View
+                    style={{
+                      borderRadius: 15,
+                      height: 48,
+                      alignItems: "center",
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      gap: 6,
+                      backgroundColor: theme.colors.accentBlue,
+                      opacity: pressed ? 0.9 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: 13,
-                        fontWeight: "600",
-                        color: isSaved
-                          ? theme.colors.accentBlue
-                          : theme.colors.textSecondary,
+                        fontSize: 14,
+                        fontFamily: theme.fontFamily.sansSemiBold,
+                        fontWeight: "700",
+                        color: "#FFFFFF",
                       }}
                     >
-                      {saveLoading
-                        ? isSaved
-                          ? "Removing..."
-                          : "Saving..."
-                        : isSaved
-                          ? "✓ Saved"
-                          : "Save"}
+                      Apply now
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: "#FFFFFF",
+                        opacity: 0.7,
+                      }}
+                    >
+                      ↗
                     </Text>
                   </View>
                 )}
               </Pressable>
+            </View>
+
+            {/* Secondary actions */}
+            <View style={{ flexDirection: "row", gap: 8 }}>
 
               <Pressable
                 onPress={() =>
@@ -1129,20 +1238,11 @@ export default function OpportunityDetailScreen() {
                     opacity: pressed ? 0.7 : 1,
                   }}
                 >
+                  <SectionLabel theme={theme}>Original source</SectionLabel>
                   <Text
                     style={{
                       fontSize: 11,
-                      fontWeight: "600",
-                      color: theme.colors.textMuted,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.6,
-                    }}
-                  >
-                    Original source
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
+                      fontFamily: theme.fontFamily.monoRegular,
                       color: theme.colors.textMuted,
                       letterSpacing: 0.3,
                     }}
@@ -1212,17 +1312,7 @@ export default function OpportunityDetailScreen() {
         {animatedSection(
           5,
           <SectionCard theme={theme}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: theme.colors.textMuted,
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-              }}
-            >
-              Related opportunities
-            </Text>
+            <SectionLabel theme={theme}>Related opportunities</SectionLabel>
 
             {isRelatedLoading ? (
               <View style={{ paddingVertical: 16, alignItems: "center" }}>

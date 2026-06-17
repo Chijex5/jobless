@@ -54,12 +54,7 @@ function MatchCard({
 }: CardProps) {
   const meta = categoryMeta(item.category, theme);
   const score = item.matchScore ?? 0;
-  const scoreCol =
-    score >= 90
-      ? theme.colors.accentRose
-      : score >= 80
-      ? theme.colors.accentBlue
-      : theme.colors.accentViolet;
+  const scoreCol = score >= 70 ? theme.colors.accentBlue : theme.colors.textMuted;
 
   return (
     <View
@@ -80,11 +75,28 @@ function MatchCard({
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               <Text style={{ fontSize: 11, color: meta.color }}>{meta.icon}</Text>
-              <Text style={{ fontSize: 11, fontWeight: '500', color: theme.colors.textMuted, letterSpacing: 0.2 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontFamily: theme.fontFamily.monoRegular,
+                  color: theme.colors.textMuted,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.4,
+                }}
+              >
                 {item.category}
               </Text>
             </View>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary, letterSpacing: -0.3, lineHeight: 20 }}>
+            <Text
+              style={{
+                fontSize: 15,
+                fontFamily: theme.fontFamily.sansExtraBold,
+                fontWeight: '800',
+                color: theme.colors.textPrimary,
+                letterSpacing: -0.3,
+                lineHeight: 20,
+              }}
+            >
               {item.title.replace(/— \d+% match/, '').trim()}
             </Text>
           </View>
@@ -100,10 +112,27 @@ function MatchCard({
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: `${scoreCol}30`,
           }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: scoreCol, letterSpacing: -0.5 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontFamily: theme.fontFamily.sansExtraBold,
+                fontWeight: '800',
+                color: scoreCol,
+                letterSpacing: -0.5,
+              }}
+            >
               {score}
             </Text>
-            <Text style={{ fontSize: 8, fontWeight: '600', color: scoreCol, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            <Text
+              style={{
+                fontSize: 8,
+                fontFamily: theme.fontFamily.monoRegular,
+                color: scoreCol,
+                opacity: 0.7,
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+              }}
+            >
               match
             </Text>
           </View>
@@ -152,14 +181,31 @@ function DeadlineCard({ item, theme, onDismiss }: CardProps) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={{ fontSize: 11, color: meta.color }}>{meta.icon}</Text>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: theme.colors.accentWarning, letterSpacing: 0.3 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: theme.fontFamily.monoRegular,
+                color: theme.colors.accentWarning,
+                textTransform: 'uppercase',
+                letterSpacing: 0.3,
+              }}
+            >
               Closes in {item.urgency}
             </Text>
           </View>
           <TimeStamp time={item.time} theme={theme} />
         </View>
 
-        <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary, letterSpacing: -0.3, lineHeight: 20 }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontFamily: theme.fontFamily.sansExtraBold,
+            fontWeight: '800',
+            color: theme.colors.textPrimary,
+            letterSpacing: -0.3,
+            lineHeight: 20,
+          }}
+        >
           {item.title.replace('Application deadline approaching in 24 hours', 'Deadline approaching')}
         </Text>
 
@@ -194,14 +240,31 @@ function TrendingCard({ item, theme, isImportant, onToggleImportant }: CardProps
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Text style={{ fontSize: 13, color: meta.color, fontWeight: '700' }}>{meta.icon}</Text>
-            <Text style={{ fontSize: 11, fontWeight: '500', color: theme.colors.textMuted }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: theme.fontFamily.monoRegular,
+                color: theme.colors.textMuted,
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+              }}
+            >
               Trending
             </Text>
           </View>
           <TimeStamp time={item.time} theme={theme} />
         </View>
 
-        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary, letterSpacing: -0.2, lineHeight: 19 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: theme.fontFamily.sansSemiBold,
+            fontWeight: '700',
+            color: theme.colors.textPrimary,
+            letterSpacing: -0.2,
+            lineHeight: 19,
+          }}
+        >
           {item.title}
         </Text>
 
@@ -244,13 +307,30 @@ function ReminderCard({ item, theme, onDismiss }: CardProps) {
 
       <View style={{ flex: 1, padding: 14, gap: 8 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 11, fontWeight: '500', color: meta.color }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontFamily: theme.fontFamily.monoRegular,
+              color: meta.color,
+              textTransform: 'uppercase',
+              letterSpacing: 0.4,
+            }}
+          >
             Queue reminder
           </Text>
           <TimeStamp time={item.time} theme={theme} />
         </View>
 
-        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary, letterSpacing: -0.2, lineHeight: 19 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: theme.fontFamily.sansSemiBold,
+            fontWeight: '700',
+            color: theme.colors.textPrimary,
+            letterSpacing: -0.2,
+            lineHeight: 19,
+          }}
+        >
           {item.title}
         </Text>
 
@@ -291,10 +371,27 @@ function InsightCard({ item, theme }: CardProps) {
       <View style={{ padding: 16, gap: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <View style={{ flex: 1, gap: 4 }}>
-            <Text style={{ fontSize: 11, fontWeight: '500', color: meta.color, letterSpacing: 0.2 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: theme.fontFamily.monoRegular,
+                color: meta.color,
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+              }}
+            >
               Market insight
             </Text>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary, letterSpacing: -0.2, lineHeight: 19 }}>
+            <Text
+              style={{
+                fontSize: 14,
+                fontFamily: theme.fontFamily.sansSemiBold,
+                fontWeight: '700',
+                color: theme.colors.textPrimary,
+                letterSpacing: -0.2,
+                lineHeight: 19,
+              }}
+            >
               {item.title}
             </Text>
           </View>
@@ -308,10 +405,27 @@ function InsightCard({ item, theme }: CardProps) {
               borderWidth: StyleSheet.hairlineWidth,
               borderColor: `${meta.color}25`,
             }}>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: meta.color, letterSpacing: -0.5 }}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontFamily: theme.fontFamily.sansExtraBold,
+                  fontWeight: '800',
+                  color: meta.color,
+                  letterSpacing: -0.5,
+                }}
+              >
                 {stat}
               </Text>
-              <Text style={{ fontSize: 8, fontWeight: '600', color: meta.color, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              <Text
+                style={{
+                  fontSize: 8,
+                  fontFamily: theme.fontFamily.monoRegular,
+                  color: meta.color,
+                  opacity: 0.7,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.3,
+                }}
+              >
                 growth
               </Text>
             </View>
@@ -376,7 +490,14 @@ type CardProps = {
 
 function TimeStamp({ time, theme }: { time: string; theme: AppTheme }) {
   return (
-    <Text style={{ fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.1 }}>
+    <Text
+      style={{
+        fontSize: 10,
+        fontFamily: theme.fontFamily.monoRegular,
+        color: theme.colors.textMuted,
+        letterSpacing: 0.1,
+      }}
+    >
       {time}
     </Text>
   );
@@ -435,7 +556,14 @@ function ActionButton({
             transform: [{ scale: pressed ? 0.97 : 1 }],
           }}
         >
-          <Text style={{ fontSize: 12, fontWeight: '600', color: textColor }}>
+          <Text
+            style={{
+              fontSize: 12,
+              fontFamily: theme.fontFamily.sansSemiBold,
+              fontWeight: '700',
+              color: textColor,
+            }}
+          >
             {label}
           </Text>
         </View>
@@ -449,11 +577,19 @@ function ActionButton({
 function SectionLabel({ title, count, theme }: { title: string; count: number; theme: AppTheme }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-      <Text style={{ fontSize: 11, fontWeight: '600', color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: theme.fontFamily.monoRegular,
+          color: theme.colors.textMuted,
+          textTransform: 'uppercase',
+          letterSpacing: 0.7,
+        }}
+      >
         {title}
       </Text>
       <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }} />
-      <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>{count}</Text>
+      <Text style={{ fontSize: 10, fontFamily: theme.fontFamily.monoRegular, color: theme.colors.textMuted }}>{count}</Text>
     </View>
   );
 }
