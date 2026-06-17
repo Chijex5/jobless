@@ -1,192 +1,30 @@
 import { Tabs } from 'expo-router';
-import { Lightbulb, Monitor, List, RadioTower, Settings } from 'lucide-react-native';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Bookmark, ClipboardList, Sparkle, SlidersHorizontal } from 'lucide-react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { useAppTheme } from '@/theme/use-app-theme';
-import { LivePulse } from '@/components/ui';
 
 const tabIcons: Record<string, React.ElementType> = {
-  index: Lightbulb,
-  signals: RadioTower,
-  queue: List,
-  monitor: Monitor,
-  settings: Settings,
+  index: Sparkle,
+  saved: Bookmark,
+  queue: ClipboardList,
+  settings: SlidersHorizontal,
 };
 
 const tabTitles: Record<string, string> = {
-  index: 'Intel',
-  signals: 'Signals',
-  queue: 'Queue',
-  monitor: 'Monitor',
+  index: 'Discover',
+  saved: 'Saved',
+  queue: 'Track',
   settings: 'Settings',
-};
-
-const screenHeaders: Record<string, (theme: any, insets: any) => React.ReactNode> = {
-  index: (theme, insets) => (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border,
-        paddingTop: insets.top + 8,
-        paddingBottom: 14,
-        paddingHorizontal: 16,
-        gap: 2,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text
-          style={{
-            fontSize: 26,
-            fontWeight: '700',
-            color: theme.colors.textPrimary,
-            letterSpacing: -0.8,
-          }}
-        >
-          Intelligence
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-            backgroundColor: theme.colors.surfaceStrong,
-            borderRadius: 999,
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.border,
-          }}
-        >
-          <LivePulse theme={theme} />
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: '600',
-              letterSpacing: 0.6,
-              color: theme.colors.textMuted,
-            }}
-          >
-            Live
-          </Text>
-        </View>
-      </View>
-      <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
-        AI confidence continuously recalculated · Source fidelity ranked
-      </Text>
-    </View>
-  ),
-
-  signals: (theme, insets) => (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border,
-        paddingTop: insets.top + 8,
-        paddingBottom: 14,
-        paddingHorizontal: 16,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 26,
-          fontWeight: '700',
-          color: theme.colors.textPrimary,
-          letterSpacing: -0.8,
-        }}
-      >
-        Signals
-      </Text>
-    </View>
-  ),
-
-  queue: (theme, insets) => (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border,
-        paddingTop: insets.top + 8,
-        paddingBottom: 14,
-        paddingHorizontal: 16,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 26,
-          fontWeight: '700',
-          color: theme.colors.textPrimary,
-          letterSpacing: -0.8,
-        }}
-      >
-        Queue
-      </Text>
-    </View>
-  ),
-
-  monitor: (theme, insets) => (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border,
-        paddingTop: insets.top + 8,
-        paddingBottom: 14,
-        paddingHorizontal: 16,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 26,
-          fontWeight: '700',
-          color: theme.colors.textPrimary,
-          letterSpacing: -0.8,
-        }}
-      >
-        Monitor
-      </Text>
-    </View>
-  ),
-
-  settings: (theme, insets) => (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.border,
-        paddingTop: insets.top + 8,
-        paddingBottom: 14,
-        paddingHorizontal: 16,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 26,
-          fontWeight: '700',
-          color: theme.colors.textPrimary,
-          letterSpacing: -0.8,
-        }}
-      >
-        Settings
-      </Text>
-    </View>
-  ),
 };
 
 export default function TabLayout() {
   const theme = useAppTheme();
-  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={({ route }) => ({
-        headerShown: true,
-        header: () => {
-          const builder = screenHeaders[route.name];
-          return builder ? builder(theme, insets) : null;
-        },
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopWidth: StyleSheet.hairlineWidth,
@@ -197,11 +35,12 @@ export default function TabLayout() {
           paddingHorizontal: 4,
           elevation: 0,
         },
-        tabBarActiveTintColor: theme.colors.textPrimary,
+        tabBarActiveTintColor: theme.colors.accentBlue,
         tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '500',
+          fontWeight: '700',
+          fontFamily: theme.fontFamily.sansBold,
           letterSpacing: 0.2,
           marginTop: 3,
         },
@@ -219,15 +58,13 @@ export default function TabLayout() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: 999,
-                backgroundColor: focused
-                  ? theme.colors.surfaceElevated
-                  : 'transparent',
               }}
             >
               <Icon
                 color={color}
-                size={18}
-                strokeWidth={focused ? 2 : 1.6}
+                size={22}
+                fill={focused && route.name === 'saved' ? color : 'none'}
+                strokeWidth={1.7}
               />
             </View>
           );
@@ -235,9 +72,8 @@ export default function TabLayout() {
       })}
     >
       <Tabs.Screen name="index" options={{ title: tabTitles.index }} />
-      <Tabs.Screen name="signals" options={{ title: tabTitles.signals }} />
+      <Tabs.Screen name="saved" options={{ title: tabTitles.saved }} />
       <Tabs.Screen name="queue" options={{ title: tabTitles.queue }} />
-      <Tabs.Screen name="monitor" options={{ title: tabTitles.monitor }} />
       <Tabs.Screen name="settings" options={{ title: tabTitles.settings }} />
     </Tabs>
   );
