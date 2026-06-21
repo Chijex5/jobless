@@ -1,6 +1,6 @@
-# jobless
+# Scout
 
-A small Expo app for tracking a daily job-search pulse.
+An Expo app that scrapes the channels you choose, scores every role against your taste, and tracks each application end to end.
 
 ## Run
 

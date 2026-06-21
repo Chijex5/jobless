@@ -5,4 +5,5 @@ export { EmptyState } from './empty-state';
 export { LivePulse } from './live-pulse';
 export { LoadingSkeleton } from './loading-skeleton';
 export { SectionHeader } from './section-header';
+export { ScoreRing, scoreRingColor } from './score-ring';
 

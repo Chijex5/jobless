@@ -19,9 +19,15 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { ArrowDownNarrowWide, Search, X } from "lucide-react-native";
+import {
+  ArrowDownNarrowWide,
+  Check,
+  Search,
+  X,
+} from "lucide-react-native";
 import { AppTheme } from "@/theme/tokens";
-import { LivePulse } from "@/components/ui";
+import { LivePulse, ScoreRing } from "@/components/ui";
+import { AppHeader } from "@/components/app-header";
 import { useAppTheme } from "@/theme/use-app-theme";
 import { api } from "@/lib/backend";
 
@@ -96,18 +102,19 @@ type SortValue = "match" | "newest" | "oldest" | "platform";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function scoreLabel(score: number) {
-  if (score >= 90) return "Excellent";
-  if (score >= 80) return "Strong";
-  if (score >= 70) return "Good";
-  return "Fair";
+// Mirrors ScoreRing's own threshold so accents elsewhere on the card (e.g.
+// the "save" button outline) match the ring's indigo / muted-gray language.
+function scoreColor(score: number, theme: AppTheme): string {
+  return score >= 70 ? theme.colors.accentBlue : theme.colors.textMuted;
 }
 
-function scoreColor(score: number, theme: AppTheme): string {
-  if (score >= 90) return theme.colors.accentRose;
-  if (score >= 80) return theme.colors.accentBlue;
-  if (score >= 70) return theme.colors.accentViolet;
-  return theme.colors.textMuted;
+function initials(text: string): string {
+  return (text ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("") || "?";
 }
 
 function timeAgo(dateStr: string | null): string {
@@ -119,86 +126,30 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function roleTypeBadgeColor(roleType: string, theme: AppTheme): string {
-  const map: Record<string, string> = {
-    "Software Engineering": theme.colors.accentBlue,
-    Data:                   theme.colors.accentViolet,
-    QA:                     theme.colors.accentWarning,
-    Design:                 theme.colors.accentRose,
-    Other:                  theme.colors.textMuted,
-  };
-  return map[roleType] ?? theme.colors.textMuted;
-}
-
-function alpha(hex: string, opacity: string): string {
-  return `${hex}${opacity}`;
-}
-
-// ─── ScoreBadge ───────────────────────────────────────────────────────────────
-
-function ScoreBadge({ score, theme }: { score: number; theme: AppTheme }) {
-  const color = scoreColor(score, theme);
-  const label = scoreLabel(score);
-  return (
-    <View
-      style={{
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 58,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: theme.radius.md,
-        backgroundColor: alpha(color, "14"),
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: alpha(color, "35"),
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 22,
-          fontWeight: "700",
-          color,
-          letterSpacing: -0.5,
-          lineHeight: 26,
-        }}
-      >
-        {score}
-      </Text>
-      <Text
-        style={{
-          fontSize: 9,
-          fontWeight: "600",
-          color,
-          opacity: 0.75,
-          letterSpacing: 0.5,
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 // ─── SkillTag ─────────────────────────────────────────────────────────────────
 
+// Indigo-tinted pill with a small checkmark — used for derived match facets
+// (work mode, top skills, seniority) on the hero + standard cards.
 function SkillTag({ tag, theme }: { tag: string; theme: AppTheme }) {
   return (
     <View
       style={{
-        borderRadius: theme.radius.sm,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surfaceStrong,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        borderRadius: theme.radius.pill,
+        backgroundColor: theme.colors.surfaceElevated,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
       }}
     >
+      <Check size={11} color={theme.colors.accentBlue} strokeWidth={2.5} />
       <Text
         style={{
           fontSize: 11,
-          fontWeight: "500",
-          color: theme.colors.textSecondary,
+          fontWeight: "600",
+          fontFamily: theme.fontFamily.sansSemiBold,
+          color: theme.colors.accentBlue,
         }}
       >
         {tag}
@@ -216,29 +167,6 @@ function WorkModeBadge({
   roleMode?: string | null;
   theme: AppTheme;
 }) {
-  const isRemote = roleMode === "Remote";
-  const isHybrid = roleMode === "Hybrid";
-
-  const color = isRemote
-    ? theme.colors.accentSuccess
-    : isHybrid
-    ? theme.colors.accentViolet
-    : theme.colors.textMuted;
-
-  const bg = isRemote
-    ? alpha(theme.colors.accentSuccess, "15")
-    : isHybrid
-    ? alpha(theme.colors.accentViolet, "15")
-    : theme.colors.surfaceStrong;
-
-  const border = isRemote
-    ? alpha(theme.colors.accentSuccess, "30")
-    : isHybrid
-    ? alpha(theme.colors.accentViolet, "30")
-    : theme.colors.border;
-
-  const dot = isRemote ? "●" : isHybrid ? "◑" : "○";
-
   return (
     <View
       style={{
@@ -248,17 +176,17 @@ function WorkModeBadge({
         borderRadius: theme.radius.sm,
         paddingHorizontal: 9,
         paddingVertical: 4,
-        backgroundColor: bg,
+        backgroundColor: theme.colors.surfaceStrong,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: border,
+        borderColor: theme.colors.border,
       }}
     >
-      <Text style={{ fontSize: 8, color, lineHeight: 12 }}>{dot}</Text>
       <Text
         style={{
           fontSize: 11,
           fontWeight: "600",
-          color,
+          fontFamily: theme.fontFamily.sansSemiBold,
+          color: theme.colors.textSecondary,
           letterSpacing: 0.2,
         }}
       >
@@ -279,7 +207,6 @@ function PlatformBadge({
 }) {
   const label = platformLabel(platform);
   if (!label) return null;
-  const color = theme.colors.accentBlue;
   return (
     <View
       style={{
@@ -289,16 +216,17 @@ function PlatformBadge({
         borderRadius: theme.radius.sm,
         paddingHorizontal: 7,
         paddingVertical: 3,
-        backgroundColor: alpha(color, "10"),
+        backgroundColor: theme.colors.surfaceStrong,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: alpha(color, "28"),
+        borderColor: theme.colors.border,
       }}
     >
       <Text
         style={{
           fontSize: 10,
           fontWeight: "600",
-          color,
+          fontFamily: theme.fontFamily.monoRegular,
+          color: theme.colors.textMuted,
           letterSpacing: 0.2,
         }}
       >
@@ -394,12 +322,12 @@ function SearchBar({
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
-        borderRadius: theme.radius.md,
+        borderRadius: theme.radius.pill,
         borderWidth: 1,
         borderColor,
         backgroundColor: theme.colors.surface,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
       }}
     >
       {/* Icon — pulses subtly while a soft search is in-flight */}
@@ -566,6 +494,7 @@ function SortSheet({
               style={{
                 fontSize: 11,
                 fontWeight: "600",
+                fontFamily: theme.fontFamily.monoRegular,
                 color: theme.colors.textMuted,
                 letterSpacing: 0.8,
                 textTransform: "uppercase",
@@ -960,6 +889,7 @@ function StatsBar({
         style={{
           fontSize: 10,
           fontWeight: "500",
+          fontFamily: theme.fontFamily.monoRegular,
           color: theme.colors.textMuted,
           letterSpacing: 0.3,
           textTransform: "uppercase",
@@ -985,7 +915,7 @@ function StatsBar({
       style={{
         flexDirection: "row",
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.md,
+        borderRadius: theme.radius.lg,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: theme.colors.border,
         paddingVertical: 16,
@@ -1027,7 +957,7 @@ function PaginationBar({
         alignItems: "center",
         justifyContent: "space-between",
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.md,
+        borderRadius: theme.radius.lg,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: theme.colors.border,
         paddingHorizontal: 16,
@@ -1108,6 +1038,67 @@ function PaginationBar({
 
 // ─── SignalCard ───────────────────────────────────────────────────────────────
 
+// Pulls a short real "why it matches / why it doesn't" clause out of the
+// existing skillAlignment / aiSummary fields — never invents new text.
+function deriveReasonLine(item: Signal): { text: string; positive: boolean } | null {
+  const source = item.skillAlignment || item.relevanceReason || item.aiSummary;
+  if (!source) return null;
+  const firstClause = source.split(/[.!?]/)[0]?.trim();
+  if (!firstClause) return null;
+  const negativeHints = /\bweak|lack|gap|missing|require[s]? stronger|limited\b/i;
+  const positive = !negativeHints.test(firstClause);
+  return { text: firstClause, positive };
+}
+
+// Derives the small indigo checkmark pills (work mode, top skills, seniority)
+// strictly from real fields — roleMode, skillTags, roleType.
+function deriveFacetTags(item: Signal): string[] {
+  const tags: string[] = [];
+  if (item.roleMode) tags.push(item.roleMode);
+  for (const tag of item.skillTags ?? []) {
+    if (tags.length >= 4) break;
+    if (!tags.includes(tag)) tags.push(tag);
+  }
+  if (tags.length < 4 && item.roleType && !tags.includes(item.roleType)) {
+    tags.push(item.roleType);
+  }
+  return tags.slice(0, 4);
+}
+
+function InitialsAvatar({
+  text,
+  size,
+  theme,
+}: {
+  text: string;
+  size: number;
+  theme: AppTheme;
+}) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.27,
+        backgroundColor: theme.colors.surfaceStrong,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: size * 0.34,
+          fontFamily: theme.fontFamily.mono,
+          color: theme.colors.textSecondary,
+          letterSpacing: 0.2,
+        }}
+      >
+        {initials(text)}
+      </Text>
+    </View>
+  );
+}
+
 function SignalCard({
   item,
   theme,
@@ -1116,6 +1107,7 @@ function SignalCard({
   loading,
   onView,
   animation,
+  isHero = false,
 }: {
   item: Signal;
   theme: AppTheme;
@@ -1124,17 +1116,12 @@ function SignalCard({
   onSave: () => void;
   onView: () => void;
   animation: Animated.Value;
+  isHero?: boolean;
 }) {
   const [sourceExpanded, setSourceExpanded] = useState(false);
-  const accent     = scoreColor(item.aiMatchScore, theme);
-  const badgeColor = roleTypeBadgeColor(item.roleType ?? "Other", theme);
-  const isRemote   = item.roleMode === "Remote";
-
-  const skills = (item.skillAlignment ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+  const accent    = scoreColor(item.aiMatchScore, theme);
+  const facetTags = deriveFacetTags(item);
+  const reason    = isHero ? null : deriveReasonLine(item);
 
   return (
     <Animated.View
@@ -1153,118 +1140,148 @@ function SignalCard({
       <View
         style={{
           backgroundColor: theme.colors.surface,
-          borderRadius: theme.radius.lg,
-          borderLeftWidth: 3,
-          borderLeftColor: isRemote
-            ? theme.colors.accentSuccess
-            : theme.colors.border,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderRightWidth: StyleSheet.hairlineWidth,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderTopColor: theme.colors.border,
-          borderRightColor: theme.colors.border,
-          borderBottomColor: theme.colors.border,
+          borderRadius: isHero ? 22 : 18,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: theme.colors.border,
           overflow: "hidden",
         }}
       >
-        {/* Score stripe */}
-        <View
-          style={{
-            height: 2,
-            backgroundColor: theme.colors.surfaceElevated,
-          }}
-        >
-          <View
-            style={{
-              height: "100%",
-              width: `${item.aiMatchScore}%`,
-              backgroundColor: accent,
-              opacity: 0.9,
-            }}
-          />
-        </View>
-
-        <View style={{ padding: 16, gap: 12 }}>
-          {/* ── Row 1: Company + Score ── */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 12,
-            }}
-          >
-            <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ padding: isHero ? 18 : 14, gap: isHero ? 14 : 10 }}>
+          {/* ── Top label row (hero only) ── */}
+          {isHero && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
               <Text
                 style={{
                   fontSize: 11,
-                  fontWeight: "600",
-                  color: theme.colors.textMuted,
-                  letterSpacing: 0.5,
+                  fontFamily: theme.fontFamily.monoRegular,
+                  color: theme.colors.accentBlue,
+                  letterSpacing: 0.8,
                   textTransform: "uppercase",
                 }}
               >
-                {item.company ?? "Unknown"}
+                ★ Top match
               </Text>
-
               <Text
                 style={{
-                  fontSize: 17,
+                  fontSize: 11,
+                  fontFamily: theme.fontFamily.monoRegular,
+                  color: theme.colors.textMuted,
+                  letterSpacing: 0.4,
+                }}
+              >
+                {timeAgo(item.postedAt)}
+              </Text>
+            </View>
+          )}
+
+          {/* ── Row: avatar + title/subtitle + score ring ── */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <InitialsAvatar
+              text={item.company ?? item.role}
+              size={isHero ? 48 : 44}
+              theme={theme}
+            />
+
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{
+                  fontSize: isHero ? 17 : 15,
                   fontWeight: "700",
+                  fontFamily: theme.fontFamily.sansBold,
                   color: theme.colors.textPrimary,
                   letterSpacing: -0.3,
-                  lineHeight: 23,
+                  lineHeight: isHero ? 22 : 20,
                 }}
                 numberOfLines={2}
               >
                 {item.role}
               </Text>
-
-              <View
+              <Text
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 6,
-                  flexWrap: "wrap",
+                  fontSize: 12,
+                  fontFamily: theme.fontFamily.sansMedium,
+                  color: theme.colors.textMuted,
                 }}
+                numberOfLines={1}
               >
-                <WorkModeBadge roleMode={item.roleMode} theme={theme} />
-
-                {item.location &&
-                  item.location !== "Unknown" &&
-                  item.location !== "Remote" && (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: theme.colors.textMuted,
-                      }}
-                    >
-                      · {item.location}
-                    </Text>
-                  )}
-
-                <PlatformBadge platform={item.platform} theme={theme} />
-              </View>
+                {[item.company, item.location, item.pay]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
             </View>
 
-            <ScoreBadge score={item.aiMatchScore} theme={theme} />
+            <ScoreRing
+              theme={theme}
+              score={item.aiMatchScore}
+              size={isHero ? 60 : 46}
+            />
           </View>
 
-          {/* ── Divider ── */}
-          <View
-            style={{
-              height: StyleSheet.hairlineWidth,
-              backgroundColor: theme.colors.border,
-            }}
-          />
+          {/* ── Facet tags (hero) ── */}
+          {isHero && facetTags.length > 0 && (
+            <View
+              style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}
+            >
+              {facetTags.map((tag) => (
+                <SkillTag key={tag} tag={tag} theme={theme} />
+              ))}
+            </View>
+          )}
 
-          {/* ── AI summary ── */}
-          {item.aiSummary != null && (
+          {/* ── Reasoning line (standard cards) ── */}
+          {!isHero && reason && (
+            <View
+              style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}
+            >
+              {reason.positive ? (
+                <Check
+                  size={13}
+                  color={theme.colors.accentBlue}
+                  strokeWidth={2.5}
+                  style={{ marginTop: 2 }}
+                />
+              ) : (
+                <X
+                  size={13}
+                  color={theme.colors.textMuted}
+                  strokeWidth={2.5}
+                  style={{ marginTop: 2 }}
+                />
+              )}
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: 12,
+                  lineHeight: 17,
+                  fontFamily: theme.fontFamily.sansMedium,
+                  color: theme.colors.textSecondary,
+                }}
+                numberOfLines={2}
+              >
+                {reason.text}
+              </Text>
+            </View>
+          )}
+
+          {/* ── AI summary (hero only — fuller context for the top card) ── */}
+          {isHero && item.aiSummary != null && (
             <Text
               style={{
                 fontSize: 13,
-                lineHeight: 20,
+                lineHeight: 19,
+                fontFamily: theme.fontFamily.sansMedium,
                 color: theme.colors.textSecondary,
               }}
             >
@@ -1272,87 +1289,33 @@ function SignalCard({
             </Text>
           )}
 
-          {/* ── Skills ── */}
-          {skills.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 6 }}
-            >
-              {skills.map((s) => (
-                <SkillTag key={s} tag={s} theme={theme} />
-              ))}
-              {(item.skillTags ?? []).slice(0, 2).map((tag) => (
-                <SkillTag key={`x-${tag}`} tag={tag} theme={theme} />
-              ))}
-            </ScrollView>
-          )}
-
-          {/* ── Meta strip ── */}
+          {/* ── Meta row ── */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "space-between",
               flexWrap: "wrap",
-              gap: 4,
+              gap: 6,
             }}
           >
             <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}
             >
-              <Text
-                style={{ fontSize: 11, color: theme.colors.textMuted }}
-              >
-                {timeAgo(item.postedAt)}
-              </Text>
-              {item.pay != null && (
-                <View
-                  style={{
-                    borderRadius: theme.radius.sm,
-                    paddingHorizontal: 7,
-                    paddingVertical: 3,
-                    backgroundColor: alpha(theme.colors.accentBlue, "10"),
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: alpha(theme.colors.accentBlue, "25"),
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: "600",
-                      color: theme.colors.accentBlue,
-                    }}
-                  >
-                    {item.pay}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {item.roleType && (
-              <View
-                style={{
-                  borderRadius: theme.radius.sm,
-                  paddingHorizontal: 7,
-                  paddingVertical: 3,
-                  backgroundColor: alpha(badgeColor, "12"),
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: alpha(badgeColor, "28"),
-                }}
-              >
+              {!isHero && <WorkModeBadge roleMode={item.roleMode} theme={theme} />}
+              <PlatformBadge platform={item.platform} theme={theme} />
+              {!isHero && (
                 <Text
                   style={{
-                    fontSize: 10,
-                    fontWeight: "600",
-                    color: badgeColor,
-                    letterSpacing: 0.3,
+                    fontSize: 11,
+                    fontFamily: theme.fontFamily.monoRegular,
+                    color: theme.colors.textMuted,
                   }}
                 >
-                  {item.roleType}
+                  {timeAgo(item.postedAt)}
                 </Text>
-              </View>
-            )}
+              )}
+            </View>
           </View>
 
           {/* ── CTAs ── */}
@@ -1364,14 +1327,14 @@ function SignalCard({
                     alignItems: "center",
                     justifyContent: "center",
                     borderRadius: theme.radius.md,
-                    paddingVertical: 12,
+                    paddingVertical: 11,
                     borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: saved ? accent : theme.colors.border,
+                    borderColor: saved ? theme.colors.accentBlue : theme.colors.border,
                     backgroundColor: saved
-                      ? alpha(accent, "12")
+                      ? theme.colors.surfaceElevated
                       : pressed
                       ? theme.colors.surfaceStrong
-                      : "transparent",
+                      : theme.colors.surface,
                     transform: [{ scale: pressed ? 0.97 : 1 }],
                   }}
                 >
@@ -1379,7 +1342,8 @@ function SignalCard({
                     style={{
                       fontSize: 13,
                       fontWeight: "600",
-                      color: saved ? accent : theme.colors.textSecondary,
+                      fontFamily: theme.fontFamily.sansSemiBold,
+                      color: saved ? theme.colors.accentBlue : theme.colors.textSecondary,
                     }}
                   >
                     {loading
@@ -1403,7 +1367,7 @@ function SignalCard({
                     flexDirection: "row",
                     gap: 6,
                     borderRadius: theme.radius.md,
-                    paddingVertical: 12,
+                    paddingVertical: 11,
                     backgroundColor: theme.colors.accentBlue,
                     opacity: pressed ? 0.85 : 1,
                     transform: [{ scale: pressed ? 0.97 : 1 }],
@@ -1413,19 +1377,11 @@ function SignalCard({
                     style={{
                       fontSize: 13,
                       fontWeight: "700",
-                      color: theme.colors.background,
+                      fontFamily: theme.fontFamily.sansBold,
+                      color: "#FFFFFF",
                     }}
                   >
-                    View Opportunity
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: theme.colors.background,
-                      opacity: 0.6,
-                    }}
-                  >
-                    ↗
+                    View opportunity
                   </Text>
                 </View>
               )}
@@ -1453,6 +1409,7 @@ function SignalCard({
                 <Text
                   style={{
                     fontSize: 10,
+                    fontFamily: theme.fontFamily.monoRegular,
                     color: theme.colors.textMuted,
                     letterSpacing: 0.6,
                     textTransform: "uppercase",
@@ -1492,7 +1449,7 @@ function SignalCard({
                 <Text
                   style={{
                     fontSize: 10,
-                    fontWeight: "600",
+                    fontFamily: theme.fontFamily.monoRegular,
                     color: theme.colors.textMuted,
                     letterSpacing: 0.5,
                     textTransform: "uppercase",
@@ -1511,7 +1468,7 @@ function SignalCard({
                   fontSize: 11,
                   lineHeight: 17,
                   color: theme.colors.textMuted,
-                  fontFamily: "monospace",
+                  fontFamily: theme.fontFamily.monoRegular,
                 }}
               >
                 {item.sourcePostPreview ?? "No preview available."}
@@ -1670,11 +1627,27 @@ export default function IntelligenceScreen() {
   const showFullLoader =
     isLoading && !isRefreshing && searchMode !== "soft";
 
-  if (showFullLoader) return <LoadingScreen theme={theme} />;
-  if (error != null)  return <ErrorScreen theme={theme} onRetry={forcedRefetch} />;
+  if (showFullLoader) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <LoadingScreen theme={theme} />
+      </View>
+    );
+  }
+  if (error != null) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <ErrorScreen theme={theme} onRetry={forcedRefetch} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader />
+
       <SortSheet
         visible={sortSheetVisible}
         activeSort={activeSort}
@@ -1685,7 +1658,7 @@ export default function IntelligenceScreen() {
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1696,6 +1669,30 @@ export default function IntelligenceScreen() {
           />
         }
       >
+        {/* ── Title block ── */}
+        <View style={{ gap: 4 }}>
+          <Text
+            style={{
+              fontSize: 30,
+              fontWeight: "800",
+              fontFamily: theme.fontFamily.sansExtraBold,
+              color: theme.colors.textPrimary,
+              letterSpacing: -0.6,
+            }}
+          >
+            Today&apos;s matches
+          </Text>
+          <Text
+            style={{
+              fontSize: 14,
+              fontFamily: theme.fontFamily.sansMedium,
+              color: theme.colors.textMuted,
+            }}
+          >
+            {total} new role{total !== 1 ? "s" : ""} · ranked for your taste
+          </Text>
+        </View>
+
         {/* ── Search bar ── */}
         <SearchBar
           value={searchInput}
@@ -1715,7 +1712,7 @@ export default function IntelligenceScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6 }}
+          contentContainerStyle={{ gap: 8 }}
         >
           {FILTERS.map((filter, index) => {
             const selected = activeFilterIndex === index;
@@ -1730,15 +1727,13 @@ export default function IntelligenceScreen() {
                 {({ pressed }) => (
                   <View
                     style={{
-                      borderRadius: 999,
+                      borderRadius: theme.radius.pill,
                       paddingHorizontal: 14,
-                      paddingVertical: 7,
-                      borderWidth: StyleSheet.hairlineWidth,
-                      borderColor: selected
-                        ? theme.colors.accentBlue
-                        : theme.colors.border,
+                      paddingVertical: 8,
+                      borderWidth: selected ? 0 : StyleSheet.hairlineWidth,
+                      borderColor: theme.colors.border,
                       backgroundColor: selected
-                        ? theme.colors.accentBlue
+                        ? theme.colors.textPrimary
                         : pressed
                         ? theme.colors.surfaceStrong
                         : theme.colors.surface,
@@ -1748,7 +1743,10 @@ export default function IntelligenceScreen() {
                     <Text
                       style={{
                         fontSize: 12,
-                        fontWeight: selected ? "700" : "400",
+                        fontWeight: selected ? "700" : "500",
+                        fontFamily: selected
+                          ? theme.fontFamily.sansBold
+                          : theme.fontFamily.sansMedium,
                         color: selected
                           ? theme.colors.background
                           : theme.colors.textSecondary,
@@ -1775,6 +1773,7 @@ export default function IntelligenceScreen() {
             style={{
               fontSize: 12,
               fontWeight: "500",
+              fontFamily: theme.fontFamily.monoRegular,
               color: theme.colors.textMuted,
             }}
           >
@@ -1787,7 +1786,7 @@ export default function IntelligenceScreen() {
             {({ pressed }) => (
               <View
                 style={{
-                  borderRadius: 999,
+                  borderRadius: theme.radius.pill,
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                   borderWidth: StyleSheet.hairlineWidth,
@@ -1809,6 +1808,7 @@ export default function IntelligenceScreen() {
                   style={{
                     fontSize: 12,
                     fontWeight: "500",
+                    fontFamily: theme.fontFamily.sansMedium,
                     color: theme.colors.textSecondary,
                   }}
                 >
@@ -1820,7 +1820,7 @@ export default function IntelligenceScreen() {
         </View>
 
         {/* ── Cards ── */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 12 }}>
           {signals.length === 0 ? (
             <EmptyScreen
               theme={theme}
@@ -1828,13 +1828,14 @@ export default function IntelligenceScreen() {
               searchQuery={searchQuery}
             />
           ) : (
-            signals.map((item) => (
+            signals.map((item, index) => (
               <SignalCard
                 key={item.id}
                 item={item}
                 theme={theme}
                 loading={saveLoading}
                 saved={item?.isSaved ?? false}
+                isHero={page === 1 && index === 0 && activeSort === "match"}
                 onSave={() => handleSave(item.id, item?.isSaved ?? false)}
                 onView={() =>
                   router.push({

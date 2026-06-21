@@ -37,55 +37,65 @@ const radius = {
   pill: 999,
 };
 
+const fontFamily = {
+  sans: 'HankenGrotesk_500Medium',
+  sansMedium: 'HankenGrotesk_500Medium',
+  sansSemiBold: 'HankenGrotesk_600SemiBold',
+  sansBold: 'HankenGrotesk_700Bold',
+  sansExtraBold: 'HankenGrotesk_800ExtraBold',
+  mono: 'JetBrainsMono_500Medium',
+  monoRegular: 'JetBrainsMono_400Regular',
+};
+
 const typography = {
-  h1: { fontSize: 28, lineHeight: 34, fontWeight: '700' as const },
-  h2: { fontSize: 20, lineHeight: 26, fontWeight: '700' as const },
-  h3: { fontSize: 16, lineHeight: 22, fontWeight: '600' as const },
-  body: { fontSize: 14, lineHeight: 21, fontWeight: '400' as const },
-  meta: { fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
-  monoMeta: { fontSize: 11, lineHeight: 15, fontWeight: '600' as const, letterSpacing: 0.6 },
+  h1: { fontSize: 28, lineHeight: 34, fontWeight: '800' as const, fontFamily: fontFamily.sansExtraBold },
+  h2: { fontSize: 20, lineHeight: 26, fontWeight: '800' as const, fontFamily: fontFamily.sansExtraBold },
+  h3: { fontSize: 16, lineHeight: 22, fontWeight: '700' as const, fontFamily: fontFamily.sansBold },
+  body: { fontSize: 14, lineHeight: 21, fontWeight: '500' as const, fontFamily: fontFamily.sansMedium },
+  meta: { fontSize: 12, lineHeight: 16, fontWeight: '600' as const, fontFamily: fontFamily.sansSemiBold },
+  monoMeta: { fontSize: 11, lineHeight: 15, fontWeight: '500' as const, letterSpacing: 0.6, fontFamily: fontFamily.monoRegular },
 };
 
 const darkPalette: ThemePalette = {
-  background:      '#080C14',  // deep navy-black — not pure black, has depth
-  surface:         '#0E1420',  // card surface — clearly distinct from bg
-  surfaceStrong:   '#141C2E',  // elevated input / tag backgrounds
-  surfaceElevated: '#1A2235',  // borders double as elevated surfaces
+  background:      '#15151A',  // near-black, slightly warm
+  surface:         '#1C1C22',  // card surface
+  surfaceStrong:   '#23232B',  // elevated input / tag backgrounds
+  surfaceElevated: '#2A2A33',  // borders double as elevated surfaces
 
-  textPrimary:   '#E2E8F0',  // warm white — easier on eyes than #FFF
-  textSecondary: '#64748B',  // slate — readable muted text
-  textMuted:     '#4A5568',  // placeholder / timestamps
+  textPrimary:   '#F2F2EF',
+  textSecondary: '#9A9AA2',
+  textMuted:     '#6B6B73',
 
-  border: '#1A2235',  // tight, matches surfaceElevated
+  border: '#2A2A33',
   shadow: '#000000',
 
-  accentBlue:    '#38BDF8',  // sky-400 — electric, modern, your primary CTA
-  accentViolet:  '#818CF8',  // indigo-400 — strong scores, saved state
-  accentSuccess: '#34D399',  // emerald-400 — remote badge, good scores
-  accentWarning: '#FBBF24',  // amber-400 — kept
-  accentError:   '#F87171',  // red-400 — kept
-  accentRose:    '#F472B6',  // pink-400 — excellent scores, replaces dull #d15c5c
+  accentBlue:    '#4F46E5',  // indigo — primary accent across the app
+  accentViolet:  '#4F46E5',
+  accentSuccess: '#34D399',
+  accentWarning: '#FBBF24',
+  accentError:   '#F87171',
+  accentRose:    '#F472B6',
 };
 
 const lightPalette: ThemePalette = {
-  background:      '#F0F4FA',  // cool-tinted white — not flat grey
+  background:      '#E7E7E3',  // warm off-white
   surface:         '#FFFFFF',
-  surfaceStrong:   '#EBF0F8',
-  surfaceElevated: '#DDE5F2',
+  surfaceStrong:   '#F1F1EC',
+  surfaceElevated: '#EEEDFB',  // tinted indigo surface for selected chips
 
-  textPrimary:   '#0D1117',
-  textSecondary: '#3D4E6B',
-  textMuted:     '#7A8CA8',
+  textPrimary:   '#18181B',
+  textSecondary: '#6B6B62',
+  textMuted:     '#8A8A82',
 
-  border: '#D8E3F0',
+  border: '#E4E4DD',
   shadow: '#00000010',
 
-  accentBlue:    '#0EA5E9',  // sky-500 — same family as dark mode, slightly deeper
-  accentViolet:  '#6366F1',  // indigo-500
-  accentSuccess: '#10B981',  // emerald-500
+  accentBlue:    '#4F46E5',  // indigo — primary accent across the app
+  accentViolet:  '#4F46E5',
+  accentSuccess: '#10B981',
   accentWarning: '#F59E0B',
   accentError:   '#EF4444',
-  accentRose:    '#EC4899',  // pink-500
+  accentRose:    '#EC4899',
 };
 
 export type AppTheme = {
@@ -94,6 +104,7 @@ export type AppTheme = {
   spacing: typeof spacing;
   radius: typeof radius;
   typography: typeof typography;
+  fontFamily: typeof fontFamily;
 };
 
 export const getTheme = (appearance: Appearance): AppTheme => ({
@@ -102,6 +113,7 @@ export const getTheme = (appearance: Appearance): AppTheme => ({
   spacing,
   radius,
   typography,
+  fontFamily,
 });
 
 export const buildNavigationTheme = (theme: AppTheme): NavigationTheme => ({
@@ -115,9 +127,9 @@ export const buildNavigationTheme = (theme: AppTheme): NavigationTheme => ({
     notification: theme.colors.accentViolet,
   },
   fonts: {
-    regular: { fontFamily: 'System', fontWeight: '400' },
-    medium:  { fontFamily: 'System', fontWeight: '500' },
-    bold:    { fontFamily: 'System', fontWeight: '600' },
-    heavy:   { fontFamily: 'System', fontWeight: '700' },
+    regular: { fontFamily: theme.fontFamily.sansMedium, fontWeight: '500' },
+    medium:  { fontFamily: theme.fontFamily.sansSemiBold, fontWeight: '600' },
+    bold:    { fontFamily: theme.fontFamily.sansBold, fontWeight: '700' },
+    heavy:   { fontFamily: theme.fontFamily.sansExtraBold, fontWeight: '800' },
   },
 });

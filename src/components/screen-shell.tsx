@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { LivePulse } from '@/components/ui';
+import { AppHeader } from '@/components/app-header';
 import type { AppTheme } from '@/theme/tokens';
 
 export function ScreenShell({
@@ -16,7 +17,8 @@ export function ScreenShell({
   children: ReactNode;
 }) {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader />
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.md,
@@ -37,7 +39,7 @@ export function ScreenShell({
         </View>
         {children}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

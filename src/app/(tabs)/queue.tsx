@@ -14,6 +14,7 @@ import { useInteligence } from '@/hooks/useInteligence';
 import { IntelligenceSignal } from '@/data/mock';
 import type { AppTheme } from '@/theme/tokens';
 import { api } from '@/lib/backend';
+import { AppHeader } from '@/components/app-header';
 import { ArrowDownNarrowWide } from 'lucide-react-native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,11 @@ type QueueItem = IntelligenceSignal & {
 const PIPELINE_STAGES: PipelineStage[] = [
   'new', 'saved', 'applied', 'interviewing', 'offered', 'rejected',
 ];
+
+// Visual progress stepper across the "active application" stages. `new` is
+// excluded since it precedes a user action; `rejected` is a terminal branch
+// shown via the stage pill rather than the linear stepper.
+const STEPPER_STAGES: PipelineStage[] = ['saved', 'applied', 'interviewing', 'offered'];
 
 const STAGE_LABELS: Record<PipelineStage, string> = {
   new: 'New',
@@ -57,13 +63,6 @@ function stageColor(stage: PipelineStage, theme: AppTheme): string {
     case 'offered': return theme.colors.accentRose;
     case 'rejected': return '#E5484D';
   }
-}
-
-function scoreColor(score: number, theme: AppTheme): string {
-  if (score >= 90) return theme.colors.accentRose;
-  if (score >= 80) return theme.colors.accentBlue;
-  if (score >= 70) return theme.colors.accentViolet;
-  return theme.colors.textMuted;
 }
 
 function timeAgo(dateStr: string | null | undefined): string {
@@ -369,21 +368,39 @@ function ErrorScreen({
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
 
 function StatsBar({ items, theme }: { items: QueueItem[]; theme: AppTheme }) {
-  const saved = items.filter((i) => i.pipelineStage === 'saved').length;
-  const active = items.filter(
-    (i) => i.pipelineStage === 'applied' || i.pipelineStage === 'interviewing'
-  ).length;
+  const applied = items.filter((i) => i.pipelineStage === 'applied').length;
+  const interviewing = items.filter((i) => i.pipelineStage === 'interviewing').length;
   const offered = items.filter((i) => i.pipelineStage === 'offered').length;
 
-  const Stat = ({ label, value, color }: { label: string; value: number; color: string }) => (
-    <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-      <Text style={{ fontSize: 22, fontWeight: '700', color, letterSpacing: -0.8 }}>
+  const StatCard = ({ label, value }: { label: string; value: number }) => (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 14,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.border,
+        paddingVertical: 14,
+        alignItems: 'center',
+        gap: 3,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 22,
+          fontFamily: theme.fontFamily.sansExtraBold,
+          fontWeight: '800',
+          color: theme.colors.textPrimary,
+          letterSpacing: -0.6,
+        }}
+      >
         {value}
       </Text>
       <Text
         style={{
           fontSize: 10,
-          fontWeight: '500',
+          fontFamily: theme.fontFamily.sansSemiBold,
+          fontWeight: '600',
           color: theme.colors.textMuted,
           textTransform: 'uppercase',
           letterSpacing: 0.3,
@@ -395,24 +412,96 @@ function StatsBar({ items, theme }: { items: QueueItem[]; theme: AppTheme }) {
   );
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.md,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.border,
-        paddingVertical: 14,
-        paddingHorizontal: 8,
-      }}
-    >
-      <Stat label="Total" value={items.length} color={theme.colors.textPrimary} />
-      <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border, marginVertical: 4 }} />
-      <Stat label="Saved" value={saved} color={theme.colors.accentBlue} />
-      <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border, marginVertical: 4 }} />
-      <Stat label="Active" value={active} color={theme.colors.accentWarning} />
-      <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border, marginVertical: 4 }} />
-      <Stat label="Offers" value={offered} color={theme.colors.accentRose} />
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <StatCard label={STAGE_LABELS.applied} value={applied} />
+      <StatCard label={STAGE_LABELS.interviewing} value={interviewing} />
+      <StatCard label={STAGE_LABELS.offered} value={offered} />
+    </View>
+  );
+}
+
+// ─── Stage Stepper ────────────────────────────────────────────────────────────
+// Horizontal progress track: small circles connected by lines, one per active
+// stage (saved → applied → interviewing → offered). Completed/current steps
+// are filled indigo; upcoming steps are light gray. The current stage label
+// is highlighted in indigo underneath. Rejected items render as a plain
+// "Rejected" notice instead of the linear stepper since it's a terminal branch.
+
+function StageStepper({ stage, theme }: { stage: PipelineStage; theme: AppTheme }) {
+  if (stage === 'rejected') {
+    return (
+      <View
+        style={{
+          paddingVertical: 8,
+          alignItems: 'center',
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: theme.fontFamily.sansSemiBold,
+            fontWeight: '600',
+            color: '#E5484D',
+          }}
+        >
+          Application closed
+        </Text>
+      </View>
+    );
+  }
+
+  // 'new' hasn't entered the active pipeline yet — show stepper with nothing filled.
+  const currentIndex = STEPPER_STAGES.indexOf(stage === 'new' ? STEPPER_STAGES[0] : stage);
+  const activeIndex = stage === 'new' ? -1 : currentIndex;
+
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {STEPPER_STAGES.map((s, i) => {
+          const done = i <= activeIndex;
+          const isLast = i === STEPPER_STAGES.length - 1;
+          return (
+            <View key={s} style={{ flexDirection: 'row', alignItems: 'center', flex: isLast ? 0 : 1 }}>
+              <View
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 5,
+                  backgroundColor: done ? theme.colors.accentBlue : theme.colors.surfaceStrong,
+                  borderWidth: done ? 0 : StyleSheet.hairlineWidth,
+                  borderColor: theme.colors.border,
+                }}
+              />
+              {!isLast && (
+                <View
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    backgroundColor: i < activeIndex ? theme.colors.accentBlue : theme.colors.surfaceStrong,
+                  }}
+                />
+              )}
+            </View>
+          );
+        })}
+      </View>
+      <View style={{ flexDirection: 'row' }}>
+        {STEPPER_STAGES.map((s, i) => (
+          <Text
+            key={s}
+            style={{
+              flex: 1,
+              fontSize: 9,
+              fontFamily: i === activeIndex ? theme.fontFamily.sansSemiBold : theme.fontFamily.sansMedium,
+              fontWeight: i === activeIndex ? '600' : '500',
+              color: i === activeIndex ? theme.colors.accentBlue : theme.colors.textMuted,
+              textAlign: i === 0 ? 'left' : i === STEPPER_STAGES.length - 1 ? 'right' : 'center',
+            }}
+          >
+            {STAGE_LABELS[s]}
+          </Text>
+        ))}
+      </View>
     </View>
   );
 }
@@ -624,6 +713,29 @@ function MoveStageRow({
 
 // ─── Queue Card ───────────────────────────────────────────────────────────────
 
+function initials(company: string | null | undefined): string {
+  if (!company) return '?';
+  const words = company.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+// Status pill style per current stage: filled indigo for "Offered", indigo-tinted
+// for the in-progress stages (applied/interviewing), neutral gray otherwise.
+function statusPillStyle(stage: PipelineStage, theme: AppTheme): { bg: string; fg: string; label: string } {
+  if (stage === 'offered') {
+    return { bg: theme.colors.accentBlue, fg: theme.colors.background, label: `${STAGE_LABELS.offered} \u{1F389}` };
+  }
+  if (stage === 'interviewing' || stage === 'applied') {
+    return { bg: theme.colors.surfaceElevated, fg: theme.colors.accentBlue, label: STAGE_LABELS[stage] };
+  }
+  if (stage === 'rejected') {
+    return { bg: `${'#E5484D'}14`, fg: '#E5484D', label: STAGE_LABELS.rejected };
+  }
+  return { bg: theme.colors.surfaceStrong, fg: theme.colors.textMuted, label: STAGE_LABELS[stage] };
+}
+
 function QueueCard({
   item,
   onMove,
@@ -637,8 +749,7 @@ function QueueCard({
   theme: AppTheme;
   animation: Animated.Value;
 }) {
-  const color = stageColor(item.pipelineStage, theme);
-  const sColor = scoreColor(item.aiMatchScore, theme);
+  const pill = statusPillStyle(item.pipelineStage, theme);
 
   return (
     <Animated.View
@@ -657,156 +768,129 @@ function QueueCard({
       <View
         style={{
           backgroundColor: theme.colors.surface,
-          borderRadius: theme.radius.lg,
+          borderRadius: 18,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: theme.colors.border,
-          overflow: 'hidden',
+          padding: 16,
+          gap: 14,
         }}
       >
-        {/* Stage stripe */}
-        <View style={{ height: 3, backgroundColor: `${color}20` }}>
-          <View style={{ height: '100%', width: '100%', backgroundColor: color, opacity: 0.8 }} />
-        </View>
-
-        <View style={{ padding: 16, gap: 12 }}>
-          {/* Header row */}
+        {/* Header row: avatar, title+company, status pill */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
           <View
             style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: 12,
+              width: 40,
+              height: 40,
+              borderRadius: 13,
+              backgroundColor: theme.colors.surfaceElevated,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: '500',
-                  color: theme.colors.textMuted,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.3,
-                }}
-              >
-                {item.company ?? 'Unknown'}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 17,
-                  fontWeight: '700',
-                  color: theme.colors.textPrimary,
-                  letterSpacing: -0.3,
-                  lineHeight: 22,
-                }}
-                numberOfLines={2}
-              >
-                {item.role}
-              </Text>
-              {item.location != null && item.location !== 'Unknown' && (
-                <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
-                  {item.location}
-                </Text>
-              )}
-            </View>
-
-            <View style={{ alignItems: 'flex-end', gap: 6 }}>
-              {/* Match score */}
-              <View
-                style={{
-                  minWidth: 52,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  borderRadius: theme.radius.sm,
-                  backgroundColor: `${sColor}12`,
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: `${sColor}30`,
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 17,
-                    fontWeight: '700',
-                    color: sColor,
-                    letterSpacing: -0.5,
-                  }}
-                >
-                  {item.aiMatchScore}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 8,
-                    fontWeight: '600',
-                    color: sColor,
-                    opacity: 0.7,
-                    letterSpacing: 0.4,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  match
-                </Text>
-              </View>
-
-              {/* Stage pill */}
-              <View
-                style={{
-                  borderRadius: 999,
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  backgroundColor: `${color}12`,
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: `${color}30`,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    fontWeight: '600',
-                    color,
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  {STAGE_LABELS[item.pipelineStage]}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View
-            style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border }}
-          />
-
-          {/* AI summary */}
-          {item.aiSummary != null && (
-            <Text style={{ fontSize: 13, lineHeight: 19, color: theme.colors.textSecondary }}>
-              {item.aiSummary}
-            </Text>
-          )}
-
-          {/* Relevance reason as hint */}
-          {item.relevanceReason != null && item.relevanceReason !== item.aiSummary && (
-            <View
+            <Text
               style={{
-                borderLeftWidth: 2,
-                borderLeftColor: theme.colors.border,
-                paddingLeft: 10,
+                fontSize: 13,
+                fontFamily: theme.fontFamily.sansExtraBold,
+                fontWeight: '800',
+                color: theme.colors.accentBlue,
               }}
             >
-              <Text style={{ fontSize: 12, lineHeight: 17, color: theme.colors.textMuted }}>
-                {item.relevanceReason}
-              </Text>
-            </View>
-          )}
+              {initials(item.company)}
+            </Text>
+          </View>
 
-          {/* Meta */}
-          <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
-            Added {timeAgo(item.postedAt)}
-          </Text>
+          <View style={{ flex: 1, gap: 2, paddingTop: 1 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontFamily: theme.fontFamily.sansBold,
+                fontWeight: '700',
+                color: theme.colors.textPrimary,
+                letterSpacing: -0.2,
+              }}
+              numberOfLines={2}
+            >
+              {item.role}
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                fontFamily: theme.fontFamily.sansMedium,
+                color: theme.colors.textSecondary,
+              }}
+              numberOfLines={1}
+            >
+              {item.company ?? 'Unknown'}
+            </Text>
+          </View>
 
-          {/* Actions */}
-          <MoveStageRow item={item} onMove={onMove} onRemove={onRemove} theme={theme} />
+          <View
+            style={{
+              borderRadius: 999,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              backgroundColor: pill.bg,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: theme.fontFamily.sansSemiBold,
+                fontWeight: '600',
+                color: pill.fg,
+                letterSpacing: 0.2,
+              }}
+            >
+              {pill.label}
+            </Text>
+          </View>
         </View>
+
+        {/* Stage stepper */}
+        <StageStepper stage={item.pipelineStage} theme={theme} />
+
+        {/* AI summary */}
+        {item.aiSummary != null && (
+          <Text style={{ fontSize: 13, lineHeight: 19, fontFamily: theme.fontFamily.sansMedium, color: theme.colors.textSecondary }}>
+            {item.aiSummary}
+          </Text>
+        )}
+
+        {/* Relevance reason as hint */}
+        {item.relevanceReason != null && item.relevanceReason !== item.aiSummary && (
+          <View
+            style={{
+              borderLeftWidth: 2,
+              borderLeftColor: theme.colors.border,
+              paddingLeft: 10,
+            }}
+          >
+            <Text style={{ fontSize: 12, lineHeight: 17, fontFamily: theme.fontFamily.sansMedium, color: theme.colors.textMuted }}>
+              {item.relevanceReason}
+            </Text>
+          </View>
+        )}
+
+        {/* Mono timestamp */}
+        <Text
+          style={{
+            fontSize: 10.5,
+            fontFamily: theme.fontFamily.monoRegular,
+            color: theme.colors.textMuted,
+            letterSpacing: 0.3,
+          }}
+        >
+          UPDATED {timeAgo(item.postedAt).toUpperCase()}
+        </Text>
+
+        {/* Actions */}
+        <MoveStageRow item={item} onMove={onMove} onRemove={onRemove} theme={theme} />
       </View>
     </Animated.View>
   );
@@ -827,10 +911,10 @@ function OfferedBanner({ items, theme }: { items: QueueItem[]; theme: AppTheme }
         gap: 4,
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.accentRose }}>
+      <Text style={{ fontSize: 13, fontFamily: theme.fontFamily.sansBold, fontWeight: '700', color: theme.colors.accentRose }}>
         🎉 {items.length === 1 ? 'You have an offer!' : `You have ${items.length} offers!`}
       </Text>
-      <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+      <Text style={{ fontSize: 12, fontFamily: theme.fontFamily.sansMedium, color: theme.colors.textSecondary }}>
         {items.map((i) => `${i.role} at ${i.company ?? 'Unknown'}`).join(' · ')}
       </Text>
     </View>
@@ -863,11 +947,11 @@ function EmptyStage({ stage, theme }: { stage: PipelineStage; theme: AppTheme })
         gap: 6,
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textMuted }}>
+      <Text style={{ fontSize: 13, fontFamily: theme.fontFamily.sansSemiBold, fontWeight: '600', color: theme.colors.textMuted }}>
         {title}
       </Text>
       <Text
-        style={{ fontSize: 12, color: theme.colors.textMuted, textAlign: 'center', lineHeight: 18 }}
+        style={{ fontSize: 12, fontFamily: theme.fontFamily.sansMedium, color: theme.colors.textMuted, textAlign: 'center', lineHeight: 18 }}
       >
         {body}
       </Text>
@@ -989,30 +1073,80 @@ export default function QueueScreen() {
   };
 
   // ── Loading ──
-  if (isLoading) return <LoadingScreen theme={theme} />;
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <LoadingScreen theme={theme} />
+      </View>
+    );
+  }
 
   // ── Error ──
   if (error != null) {
     return (
-      <ErrorScreen
-        theme={theme}
-        onRetry={() => {
-          if (typeof refetch === 'function') refetch();
-        }}
-      />
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <ErrorScreen
+          theme={theme}
+          onRetry={() => {
+            if (typeof refetch === 'function') refetch();
+          }}
+        />
+      </View>
     );
   }
+
+  const activeCount = allQueueItems.filter(
+    (i) => i.pipelineStage === 'applied' || i.pipelineStage === 'interviewing'
+  ).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ConfettiLayer active={showConfetti} />
 
+      <AppHeader />
+
+      {/* Fixed header */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 14,
+          gap: 14,
+          backgroundColor: theme.colors.background,
+        }}
+      >
+        <View style={{ gap: 4 }}>
+          <Text
+            style={{
+              fontSize: 30,
+              fontFamily: theme.fontFamily.sansExtraBold,
+              fontWeight: '800',
+              color: theme.colors.textPrimary,
+              letterSpacing: -0.5,
+            }}
+          >
+            Applications
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: theme.fontFamily.sansMedium,
+              color: theme.colors.textMuted,
+            }}
+          >
+            {activeCount} active · update stages yourself
+          </Text>
+        </View>
+
+        <StatsBar items={allQueueItems} theme={theme} />
+      </View>
+
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 110, gap: 12 }}
         showsVerticalScrollIndicator={false}
       >
-        <StatsBar items={allQueueItems} theme={theme} />
-
         {offeredItems.length > 0 && (
           <OfferedBanner items={offeredItems} theme={theme} />
         )}
@@ -1032,7 +1166,7 @@ export default function QueueScreen() {
             justifyContent: 'space-between',
           }}
         >
-          <Text style={{ fontSize: 12, fontWeight: '500', color: theme.colors.textMuted }}>
+          <Text style={{ fontSize: 12, fontFamily: theme.fontFamily.sansMedium, fontWeight: '500', color: theme.colors.textMuted }}>
             {visibleItems.length} result{visibleItems.length !== 1 ? 's' : ''} · {STAGE_LABELS[activeStage]}
           </Text>
 

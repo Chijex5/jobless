@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "jobless",
+    "name": "Scout",
     "slug": "jobless",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "jobless",
+    "scheme": "scout",
     "userInterfaceStyle": "automatic",
     "icon": "./src/assets/logo.png",
     "ios": {
-      "bundleIdentifier": "com.chijex5.jobless",
+      "bundleIdentifier": "com.chijex5.scout",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -17,9 +17,9 @@
       "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/logo.png",
-        "backgroundColor": "#f7f3ec"
+        "backgroundColor": "#E7E7E3"
       },
-      "package": "com.chijex5.jobless"
+      "package": "com.chijex5.scout"
     },
     "web": {
       "output": "static",
@@ -30,11 +30,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#f7f3ec",
+          "backgroundColor": "#E7E7E3",
           "image": "./src/assets/logo.png",
           "imageWidth": 220
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
