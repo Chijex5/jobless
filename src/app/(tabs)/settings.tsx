@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Modal,
   Pressable,
   ScrollView,
+  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -14,10 +16,12 @@ import { Check, Plus, Radio, Globe, Link } from 'lucide-react-native';
 import { useThemeStore } from '@/store/theme-store';
 
 import { ScreenShell } from '@/components/screen-shell';
-import { Card, Chip, SectionHeader } from '@/components/ui';
+import { Card, Chip, LoadingSkeleton, SectionHeader } from '@/components/ui';
+import { TelegramRenewalModal } from '@/components/telegram-renewal-modal';
 import { useAppTheme } from '@/theme/use-app-theme';
-import { baseUrl } from '@/lib/backend';
+import { api, baseUrl } from '@/lib/backend';
 import { loadSettings, saveSettings } from '@/lib/storage/settings';
+import { loadAdminToken, saveAdminToken } from '@/lib/storage/admin-token';
 
 const API_BASE = baseUrl;
 
@@ -59,6 +63,38 @@ type MonitorSummary = {
   totalSignals: number;
   newSignals: number;
   nextRun: string | null;
+};
+
+/** Shape emitted by GET /health on the backend */
+type DepStatus = 'ok' | 'degraded' | 'down';
+
+type DepResult = {
+  status: DepStatus;
+  latency_ms: number;
+  detail?: string | null;
+};
+
+type SchedulerJob = {
+  id: string;
+  next_run: string | null;
+  running: boolean;
+};
+
+type HealthResponse = {
+  status: DepStatus;
+  version: string;
+  timestamp: string;
+  db_name: string;
+  gemini_keys: number;
+  dependencies: {
+    mongodb: DepResult;
+    gemini: DepResult;
+    telegram: DepResult;
+  };
+  scheduler: {
+    daily_scrape: SchedulerJob;
+    weekly_notifications: SchedulerJob;
+  };
 };
 
 // ── Primitives ────────────────────────────────────────────────────────────────
@@ -286,6 +322,165 @@ function ScanningLiveCard({
   );
 }
 
+// ── Backend health board ───────────────────────────────────────────────────────
+function statusColor(theme: AppTheme, status: DepStatus): string {
+  switch (status) {
+    case 'ok':
+      return theme.colors.accentSuccess;
+    case 'degraded':
+      return theme.colors.accentWarning;
+    case 'down':
+      return theme.colors.accentError;
+  }
+}
+
+function DependencyRow({ theme, label, dep }: { theme: AppTheme; label: string; dep: DepResult }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: theme.spacing.xs,
+      }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: statusColor(theme, dep.status),
+          }}
+        />
+        <Text style={{ ...theme.typography.body, color: theme.colors.textPrimary }}>{label}</Text>
+      </View>
+      <Text style={{ ...theme.typography.monoMeta, color: theme.colors.textMuted }}>
+        {dep.status} · {dep.latency_ms}ms
+      </Text>
+    </View>
+  );
+}
+
+function SchedulerRow({ theme, label, job }: { theme: AppTheme; label: string; job: SchedulerJob }) {
+  const nextRun = job.next_run ? new Date(job.next_run).toLocaleString() : 'Not scheduled';
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: theme.spacing.xs,
+      }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: job.running ? theme.colors.accentBlue : theme.colors.textMuted,
+          }}
+        />
+        <Text style={{ ...theme.typography.body, color: theme.colors.textPrimary }}>{label}</Text>
+      </View>
+      <Text style={{ ...theme.typography.monoMeta, color: theme.colors.textMuted }} numberOfLines={1}>
+        {job.running ? 'Running' : nextRun}
+      </Text>
+    </View>
+  );
+}
+
+function HealthBoardCard({
+  theme,
+  health,
+  isLoading,
+  error,
+  onRetry,
+  onRenewTelegram,
+}: {
+  theme: AppTheme;
+  health: HealthResponse | null;
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onRenewTelegram: () => void;
+}) {
+  if (isLoading && !health) {
+    return (
+      <Card theme={theme}>
+        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Backend health</Text>
+        <LoadingSkeleton theme={theme} height={16} />
+        <LoadingSkeleton theme={theme} height={16} />
+        <LoadingSkeleton theme={theme} height={16} />
+      </Card>
+    );
+  }
+
+  if (error && !health) {
+    return (
+      <Card theme={theme}>
+        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Backend health</Text>
+        <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>{error}</Text>
+        <Pressable onPress={onRetry}>
+          <Text style={{ ...theme.typography.body, color: theme.colors.accentBlue, fontWeight: '600' }}>
+            Retry
+          </Text>
+        </Pressable>
+      </Card>
+    );
+  }
+
+  if (!health) return null;
+
+  const telegramNeedsAttention = health.dependencies.telegram.status !== 'ok';
+
+  return (
+    <Card theme={theme}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Backend health</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: statusColor(theme, health.status),
+            }}
+          />
+          <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+            {health.status} · v{health.version}
+          </Text>
+        </View>
+      </View>
+
+      <Divider theme={theme} />
+      <DependencyRow theme={theme} label="MongoDB" dep={health.dependencies.mongodb} />
+      <DependencyRow theme={theme} label="Gemini" dep={health.dependencies.gemini} />
+      <DependencyRow theme={theme} label="Telegram" dep={health.dependencies.telegram} />
+
+      <Divider theme={theme} />
+      <SchedulerRow theme={theme} label="Daily scrape" job={health.scheduler.daily_scrape} />
+      <SchedulerRow theme={theme} label="Weekly notifications" job={health.scheduler.weekly_notifications} />
+
+      {telegramNeedsAttention && (
+        <Pressable
+          onPress={onRenewTelegram}
+          style={({ pressed }) => ({
+            marginTop: theme.spacing.xs,
+            borderRadius: theme.radius.sm,
+            paddingVertical: theme.spacing.sm,
+            alignItems: 'center',
+            backgroundColor: statusColor(theme, health.dependencies.telegram.status),
+            opacity: pressed ? 0.8 : 1,
+          })}>
+          <Text style={{ ...theme.typography.body, color: '#fff', fontWeight: '600' }}>
+            Renew Telegram session
+          </Text>
+        </Pressable>
+      )}
+    </Card>
+  );
+}
+
 // ── Progress Bar ──────────────────────────────────────────────────────────────
 function ScrapeProgressBar({
   theme,
@@ -414,6 +609,85 @@ function ChannelRow({
   );
 }
 
+// ── Admin token entry (small modal, mirrors SortSheet's bottom-sheet pattern) ──
+function AdminTokenModal({
+  visible,
+  onClose,
+  theme,
+  onSave,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: AppTheme;
+  onSave: (token: string) => void;
+}) {
+  const [value, setValue] = useState('');
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+        onPress={onClose}>
+        <Pressable>
+          <View
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderTopLeftRadius: theme.radius.lg,
+              borderTopRightRadius: theme.radius.lg,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderBottomWidth: 0,
+              borderColor: theme.colors.border,
+              padding: theme.spacing.lg,
+              paddingBottom: 40,
+              gap: theme.spacing.sm,
+            }}>
+            <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Admin token</Text>
+            <Text style={{ ...theme.typography.meta, color: theme.colors.textMuted }}>
+              Required to renew the Telegram session. Stored securely on this device.
+            </Text>
+            <TextInput
+              value={value}
+              onChangeText={setValue}
+              placeholder="x-admin-token"
+              placeholderTextColor={theme.colors.textMuted}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                borderRadius: theme.radius.sm,
+                paddingHorizontal: theme.spacing.sm,
+                paddingVertical: theme.spacing.sm,
+                ...theme.typography.body,
+                color: theme.colors.textPrimary,
+                backgroundColor: theme.colors.surfaceStrong,
+              }}
+            />
+            <Pressable
+              onPress={() => {
+                if (!value.trim()) return;
+                onSave(value.trim());
+                setValue('');
+                onClose();
+              }}
+              disabled={!value.trim()}
+              style={({ pressed }) => ({
+                borderRadius: theme.radius.sm,
+                paddingVertical: theme.spacing.sm,
+                alignItems: 'center',
+                backgroundColor: !value.trim() ? theme.colors.border : theme.colors.accentBlue,
+                opacity: pressed ? 0.8 : 1,
+              })}>
+              <Text style={{ ...theme.typography.body, color: '#fff', fontWeight: '600' }}>Save</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 const SCRAPE_INTERVALS = ['Every 15m', 'Every 30m', 'Every 1h', 'Every 6h', 'Manual only'];
 const MATCH_THRESHOLDS = ['60%', '70%', '80%', '90%', '95%'];
@@ -449,6 +723,17 @@ export default function SettingsScreen() {
   // Only the lightweight totals needed for the "Scanning live" status card —
   // the full event log / platform breakdown was intentionally dropped.
   const [monitorSummary, setMonitorSummary] = useState<MonitorSummary | null>(null);
+
+  // ── Backend health board (polled) ─────────────────────────────────────────
+  const [health, setHealth]             = useState<HealthResponse | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError]   = useState<string | null>(null);
+  const healthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Admin token + Telegram renewal ────────────────────────────────────────
+  const [adminToken, setAdminToken]                   = useState<string | null>(null);
+  const [adminTokenModalVisible, setAdminTokenModalVisible] = useState(false);
+  const [renewalModalVisible, setRenewalModalVisible] = useState(false);
 
   // ── Telegram channels (API-backed) ────────────────────────────────────────
   const [channels, setChannels]     = useState<Channel[]>([]);
@@ -502,6 +787,32 @@ export default function SettingsScreen() {
       }
     }
     fetchMonitorSummary();
+  }, []);
+
+  // ── Backend health board: fetch on mount, then poll every 30s ────────────
+  async function fetchHealth() {
+    try {
+      const data = await api.get<HealthResponse>('/health');
+      setHealth(data);
+      setHealthError(null);
+    } catch {
+      setHealthError('Unable to reach backend');
+    } finally {
+      setHealthLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchHealth();
+    healthPollRef.current = setInterval(fetchHealth, 30000);
+    return () => {
+      if (healthPollRef.current) clearInterval(healthPollRef.current);
+    };
+  }, []);
+
+  // ── Load the persisted admin token once on mount ──────────────────────────
+  useEffect(() => {
+    loadAdminToken().then(setAdminToken);
   }, []);
 
   async function fetchChannels() {
@@ -676,6 +987,16 @@ export default function SettingsScreen() {
 
       {/* ── Scanning live status (folded in from the removed Monitor tab) ── */}
       <ScanningLiveCard theme={theme} scrapeEvent={scrapeEvent} monitor={monitorSummary} />
+
+      {/* ── Backend health board ─────────────────────────────────────────── */}
+      <HealthBoardCard
+        theme={theme}
+        health={health}
+        isLoading={healthLoading}
+        error={healthError}
+        onRetry={fetchHealth}
+        onRenewTelegram={() => setRenewalModalVisible(true)}
+      />
 
       {/* ── Force scrape ─────────────────────────────────────────────────── */}
       <Card theme={theme}>
@@ -940,6 +1261,21 @@ export default function SettingsScreen() {
             {addError}
           </Text>
         ) : null}
+
+        <Divider theme={theme} />
+        <ActionRow
+          theme={theme}
+          label="Admin token"
+          sub={adminToken ? 'Token set' : 'Not set — required for renewal'}
+          onPress={() => setAdminTokenModalVisible(true)}
+        />
+        <Divider theme={theme} />
+        <ActionRow
+          theme={theme}
+          label="Renew Telegram session"
+          sub="Re-authenticate the scraper's Telegram account"
+          onPress={() => setRenewalModalVisible(true)}
+        />
       </Card>
 
       {/* ════════════════════════ YOUR TASTE ═════════════════════════════ */}
@@ -1142,6 +1478,25 @@ export default function SettingsScreen() {
           onPress={() => {}}
         />
       </Card>
+
+      <AdminTokenModal
+        visible={adminTokenModalVisible}
+        onClose={() => setAdminTokenModalVisible(false)}
+        theme={theme}
+        onSave={(token) => {
+          setAdminToken(token);
+          saveAdminToken(token);
+        }}
+      />
+
+      <TelegramRenewalModal
+        visible={renewalModalVisible}
+        onClose={() => setRenewalModalVisible(false)}
+        theme={theme}
+        adminToken={adminToken}
+        onRenewed={fetchHealth}
+        onRequireToken={() => setAdminTokenModalVisible(true)}
+      />
     </ScreenShell>
   );
 }

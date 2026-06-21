@@ -5,12 +5,13 @@ export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const { headers, ...rest } = options;
   const res = await fetch(`${baseUrl}${endpoint}`, {
+    ...rest,
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {}),
+      ...(headers || {}),
     },
-    ...options,
   });
 
   const data = await res.json().catch(() => null);
@@ -23,29 +24,33 @@ export async function request<T>(
 }
 
 export const api = {
-  get: <T>(endpoint: string) =>
-    request<T>(endpoint),
+  get: <T>(endpoint: string, options: RequestInit = {}) =>
+    request<T>(endpoint, options),
 
-  post: <T>(endpoint: string, data: any) =>
+  post: <T>(endpoint: string, data: any, options: RequestInit = {}) =>
     request<T>(endpoint, {
       method: "POST",
       body: JSON.stringify(data),
+      ...options,
     }),
 
-  put: <T>(endpoint: string, data: any) =>
+  put: <T>(endpoint: string, data: any, options: RequestInit = {}) =>
     request<T>(endpoint, {
       method: "PUT",
       body: JSON.stringify(data),
+      ...options,
     }),
 
-  patch: <T>(endpoint: string, data: any) =>
+  patch: <T>(endpoint: string, data: any, options: RequestInit = {}) =>
     request<T>(endpoint, {
       method: "PATCH",
       body: JSON.stringify(data),
+      ...options,
     }),
 
-  delete: <T>(endpoint: string) =>
+  delete: <T>(endpoint: string, options: RequestInit = {}) =>
     request<T>(endpoint, {
       method: "DELETE",
+      ...options,
     }),
 };
