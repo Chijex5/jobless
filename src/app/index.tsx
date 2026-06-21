@@ -15,7 +15,7 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.brand}>jobless</Text>
+      <Text style={styles.brand}>Scout</Text>
       <ActivityIndicator size="small" color="#1f2937" />
     </View>
   );

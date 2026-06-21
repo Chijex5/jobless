@@ -16,6 +16,7 @@ import { IntelligenceSignal } from '@/data/mock';
 import type { AppTheme } from '@/theme/tokens';
 import { api } from '@/lib/backend';
 import { ScoreRing } from '@/components/ui';
+import { AppHeader } from '@/components/app-header';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -466,11 +467,17 @@ export default function SavedScreen() {
   };
 
   if (error != null) {
-    return <ErrorScreen theme={theme} onRetry={() => forcedRefetch()} />;
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <ErrorScreen theme={theme} onRetry={() => forcedRefetch()} />
+      </View>
+    );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <AppHeader />
       <SavedHeader count={signals.length} sortKey={sortKey} onSortChange={setSortKey} theme={theme} />
 
       <ScrollView

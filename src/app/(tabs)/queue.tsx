@@ -14,6 +14,7 @@ import { useInteligence } from '@/hooks/useInteligence';
 import { IntelligenceSignal } from '@/data/mock';
 import type { AppTheme } from '@/theme/tokens';
 import { api } from '@/lib/backend';
+import { AppHeader } from '@/components/app-header';
 import { ArrowDownNarrowWide } from 'lucide-react-native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1072,17 +1073,27 @@ export default function QueueScreen() {
   };
 
   // ── Loading ──
-  if (isLoading) return <LoadingScreen theme={theme} />;
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <LoadingScreen theme={theme} />
+      </View>
+    );
+  }
 
   // ── Error ──
   if (error != null) {
     return (
-      <ErrorScreen
-        theme={theme}
-        onRetry={() => {
-          if (typeof refetch === 'function') refetch();
-        }}
-      />
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <AppHeader />
+        <ErrorScreen
+          theme={theme}
+          onRetry={() => {
+            if (typeof refetch === 'function') refetch();
+          }}
+        />
+      </View>
     );
   }
 
@@ -1093,6 +1104,8 @@ export default function QueueScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ConfettiLayer active={showConfetti} />
+
+      <AppHeader />
 
       {/* Fixed header */}
       <View

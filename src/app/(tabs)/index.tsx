@@ -19,22 +19,17 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowDownNarrowWide,
-  Bell,
   Check,
   Search,
   X,
 } from "lucide-react-native";
 import { AppTheme } from "@/theme/tokens";
 import { LivePulse, ScoreRing } from "@/components/ui";
+import { AppHeader } from "@/components/app-header";
 import { useAppTheme } from "@/theme/use-app-theme";
 import { api } from "@/lib/backend";
-
-// The app doesn't have a real authenticated-user object yet — derive the
-// avatar initial from the configured account email so it isn't fabricated.
-const ACCOUNT_EMAIL = "embroconnect2@gmail.com";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1486,125 +1481,11 @@ function SignalCard({
   );
 }
 
-// ─── DiscoverHeader ───────────────────────────────────────────────────────────
-// Fixed (non-scrolling) header: logo mark + wordmark on the left, account
-// initial avatar + a bell button that reaches the old Signals/notifications
-// route on the right.
-
-function DiscoverHeader({
-  theme,
-  insetsTop,
-  onOpenNotifications,
-}: {
-  theme: AppTheme;
-  insetsTop: number;
-  onOpenNotifications: () => void;
-}) {
-  const accountInitial = ACCOUNT_EMAIL.trim().charAt(0).toUpperCase() || "U";
-
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingTop: insetsTop + 10,
-        paddingBottom: 10,
-        paddingHorizontal: 16,
-        backgroundColor: theme.colors.background,
-      }}
-    >
-      {/* Logo mark + wordmark */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-        <View
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: 8,
-            backgroundColor: theme.colors.accentBlue,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "800",
-              fontFamily: theme.fontFamily.sansExtraBold,
-              color: "#FFFFFF",
-            }}
-          >
-            S
-          </Text>
-        </View>
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: "800",
-            fontFamily: theme.fontFamily.sansExtraBold,
-            color: theme.colors.textPrimary,
-            letterSpacing: -0.4,
-          }}
-        >
-          Scout
-        </Text>
-      </View>
-
-      {/* Notifications + avatar */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Pressable onPress={onOpenNotifications} hitSlop={8}>
-          {({ pressed }) => (
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: pressed
-                  ? theme.colors.surfaceStrong
-                  : theme.colors.surface,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: theme.colors.border,
-              }}
-            >
-              <Bell size={16} color={theme.colors.textSecondary} strokeWidth={2} />
-            </View>
-          )}
-        </Pressable>
-
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.colors.surfaceStrong,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: "700",
-              fontFamily: theme.fontFamily.sansBold,
-              color: theme.colors.textSecondary,
-            }}
-          >
-            {accountInitial}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 // ─── IntelligenceScreen ───────────────────────────────────────────────────────
 
 export default function IntelligenceScreen() {
   const theme  = useAppTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const [activeFilterIndex, setActiveFilterIndex] = useState(0);
   const [activeSort, setActiveSort]               = useState<SortValue>("match");
@@ -1749,7 +1630,7 @@ export default function IntelligenceScreen() {
   if (showFullLoader) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <DiscoverHeader theme={theme} insetsTop={insets.top} onOpenNotifications={() => router.push("/notifications")} />
+        <AppHeader />
         <LoadingScreen theme={theme} />
       </View>
     );
@@ -1757,7 +1638,7 @@ export default function IntelligenceScreen() {
   if (error != null) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <DiscoverHeader theme={theme} insetsTop={insets.top} onOpenNotifications={() => router.push("/notifications")} />
+        <AppHeader />
         <ErrorScreen theme={theme} onRetry={forcedRefetch} />
       </View>
     );
@@ -1765,7 +1646,7 @@ export default function IntelligenceScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <DiscoverHeader theme={theme} insetsTop={insets.top} onOpenNotifications={() => router.push("/notifications")} />
+      <AppHeader />
 
       <SortSheet
         visible={sortSheetVisible}
